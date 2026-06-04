@@ -1,10 +1,10 @@
 # =========================================================
-# 三部位 genus 水平空间分层模式菌分析脚本
-# 设计思路：
-# 1. genus count 表用于 ANCOM-BC2
-# 2. Friedman 作为三组配对 overall 入口
-# 3. 配对 Wilcoxon 作为两两辅助判定
-# 4. 基于三组中位相对丰度进行空间分层模式分类
+# Three-site genus-level spatial stratification analysis script
+# Design rationale:
+# 1. Use the genus count table for ANCOM-BC2
+# 2. Use the Friedman test as the overall paired three-group entry test
+# 3. Use paired Wilcoxon tests as pairwise auxiliary tests
+# 4. Classify spatial stratification patterns based on median relative abundance across the three sites
 # =========================================================
 
 rm(list = ls())
@@ -14,7 +14,7 @@ options(stringsAsFactors = FALSE)
 options(scipen = 999)
 
 # =========================================================
-# 0. 加载包
+# 0. Load packages
 # =========================================================
 need_cran <- c(
   "readxl",
@@ -55,7 +55,7 @@ library(phyloseq)
 library(ANCOMBC)
 
 # =========================================================
-# 1. 参数设置
+# 1. Parameter settings
 # =========================================================
 # Input and output directories
 # Please place the required input files in "data/feature_taxa/input".
@@ -70,12 +70,12 @@ abund_file <- file.path(in_dir, "genus_abundance_3group_merged.xlsx")
 meta_file  <- file.path(in_dir, "metadata_3group.xlsx")
 tax_file   <- file.path(in_dir, "taxonomy_genus.xlsx")
 
-# 分组与配对
+# Grouping and pairing
 group_var    <- "Group"
 subject_var  <- "SheepID"
 group_levels <- c("Rum", "Ile", "Col")
 
-# ANCOM-BC2 参数
+# ANCOM-BC2 parameters
 prv_cut      <- 0.10
 lib_cut      <- 1000
 pseudo_sens  <- TRUE
@@ -84,15 +84,15 @@ neg_lb       <- FALSE
 alpha_main   <- 0.001
 p_adj_method <- "BH"
 
-# Friedman / pairwise / 模式分类阈值
+# Friedman / pairwise / pattern-classification thresholds
 overall_q_cut  <- 0.001
 pairwise_q_cut <- 0.001
 
-# 代表菌输出数量
+# Number of representative genera to output
 top_n_each_subclass <- 15
 
 # =========================================================
-# 2. 读取数据
+# 2. Read data
 # =========================================================
 abund_df <- read_excel(abund_file, sheet = 1)
 meta_df  <- read_excel(meta_file, sheet = 1)
@@ -105,14 +105,14 @@ colnames(tax_df)[1] <- "Genus"
 abund_df <- abund_df %>%
   filter(!is.na(Genus), Genus != "")
 
-# 丰度表 genus 去重：若重复则求和
+# Deduplicate genera in the abundance table: sum rows if duplicated
 if (anyDuplicated(abund_df$Genus) > 0) {
   abund_df <- abund_df %>%
     group_by(Genus) %>%
     summarise(across(where(is.numeric), ~ sum(.x, na.rm = TRUE)), .groups = "drop")
 }
 
-# taxonomy genus 去重：保留第一条
+# Deduplicate genera in taxonomy: keep the first record
 if (anyDuplicated(tax_df$Genus) > 0) {
   tax_df <- tax_df %>%
     distinct(Genus, .keep_all = TRUE)
@@ -126,7 +126,7 @@ meta_df <- meta_df %>%
   )
 
 # =========================================================
-# 3. 输入一致性检查
+# 3. Input consistency check
 # =========================================================
 sample_cols <- colnames(abund_df)[-1]
 
@@ -134,13 +134,13 @@ missing_in_meta  <- setdiff(sample_cols, meta_df$SampleID)
 missing_in_abund <- setdiff(meta_df$SampleID, sample_cols)
 
 if (length(missing_in_meta) > 0) {
-  stop("丰度表中的以下样本在 metadata 中不存在：\n", paste(missing_in_meta, collapse = ", "))
+  stop("The following samples in the abundance table are absent from metadata:\n", paste(missing_in_meta, collapse = ", "))
 }
 if (length(missing_in_abund) > 0) {
-  stop("metadata 中的以下样本在丰度表中不存在：\n", paste(missing_in_abund, collapse = ", "))
+  stop("The following samples in metadata are absent from the abundance table:\n", paste(missing_in_abund, collapse = ", "))
 }
 
-# 按 metadata 顺序重排丰度表
+# Reorder abundance table according to metadata
 abund_df <- abund_df %>%
   select(Genus, all_of(meta_df$SampleID))
 
@@ -149,14 +149,14 @@ sheep_count <- table(meta_df$SheepID)
 
 qc_sample_alignment <- data.frame(
   check_item = c(
-    "丰度表样本数",
-    "metadata样本数",
-    "共同样本数",
-    "Rum样本数",
-    "Ile样本数",
-    "Col样本数",
-    "SheepID数量",
-    "每个SheepID是否均为3个样本"
+    "Abundance-table sample count",
+    "metadata sample count",
+    "Shared sample count",
+    "Rum sample count",
+    "Ile sample count",
+    "Col sample count",
+    "SheepID count",
+    "Whether each SheepID has exactly three samples"
   ),
   value = c(
     length(sample_cols),
@@ -166,16 +166,16 @@ qc_sample_alignment <- data.frame(
     unname(group_count["Ile"]),
     unname(group_count["Col"]),
     length(unique(meta_df$SheepID)),
-    ifelse(all(sheep_count == 3), "是", "否")
+    ifelse(all(sheep_count == 3), "Yes", "No")
   )
 )
 
 if (!all(sheep_count == 3)) {
-  warning("并非所有 SheepID 都恰好对应 3 个部位样本，请检查配对结构。")
+  warning("Not all SheepID values correspond to exactly three site samples; please check the paired structure.")
 }
 
 # =========================================================
-# 4. 构建 phyloseq 对象
+# 4. Construct phyloseq object
 # =========================================================
 otu_mat <- abund_df %>%
   column_to_rownames("Genus") %>%
@@ -206,7 +206,7 @@ ps <- phyloseq(
 )
 
 # =========================================================
-# 5. 预处理统计信息
+# 5. Preprocessing statistics
 # =========================================================
 lib_sizes <- sample_sums(ps)
 
@@ -220,12 +220,12 @@ prev_df <- data.frame(
 
 qc_preprocess <- data.frame(
   item = c(
-    "原始genus数",
-    "样本数",
-    "最小测序深度",
-    "中位测序深度",
-    "最大测序深度",
-    "overall prevalence >= 0.10 的genus数"
+    "Raw genus count",
+    "sample count",
+    "Minimum sequencing depth",
+    "Median sequencing depth",
+    "Maximum sequencing depth",
+    "Number of genera with overall prevalence >= 0.10"
   ),
   value = c(
     ntaxa(ps),
@@ -238,10 +238,10 @@ qc_preprocess <- data.frame(
 )
 
 # =========================================================
-# 6. 运行 ANCOM-BC2
-#    这里保留 ANCOM-BC2，但不再使用 res_global 作为 overall 入口
+# 6. Run ANCOM-BC2
+#    ANCOM-BC2 is retained here, but res_global is no longer used as the overall entry test
 # =========================================================
-message("开始运行 ANCOM-BC2 ...")
+message("Starting ANCOM-BC2 ...")
 
 set.seed(123)
 
@@ -272,10 +272,10 @@ res_ancom <- ancombc2(
   verbose = TRUE
 )
 
-message("ANCOM-BC2 运行完成。")
+message("ANCOM-BC2 completed.")
 
 # =========================================================
-# 7. 整理 ANCOM-BC2 主结果
+# 7. Format main ANCOM-BC2 results
 # =========================================================
 res_main <- as.data.frame(res_ancom$res)
 
@@ -307,13 +307,13 @@ ancom_main_tbl <- res_main %>%
   left_join(prev_df, by = "Genus") %>%
   left_join(tax_df, by = "Genus")
 
-# 另存原始 ANCOM-BC2 结果
+# Save raw ANCOM-BC2 results separately
 ancom_raw_tbl <- res_main %>%
   left_join(prev_df, by = "Genus") %>%
   left_join(tax_df, by = "Genus")
 
 # =========================================================
-# 8. 计算三组中位相对丰度（仅用于模式判定）
+# 8. Calculate median relative abundance across the three sites (for pattern classification only)
 # =========================================================
 rel_mat <- sweep(otu_mat, 2, colSums(otu_mat), "/")
 rel_mat[is.na(rel_mat)] <- 0
@@ -346,7 +346,7 @@ pattern_base_tbl$order_string <- pmap_chr(
 )
 
 # =========================================================
-# 9. 构造长表 / 宽表
+# 9. Construct long and wide tables
 # =========================================================
 rel_long <- as.data.frame(rel_mat) %>%
   rownames_to_column("Genus") %>%
@@ -358,10 +358,10 @@ rel_wide <- rel_long %>%
   pivot_wider(names_from = Group, values_from = RelAbund)
 
 # =========================================================
-# 10. Friedman overall 检验
-#    这是三组配对 overall 的真实入口
+# 10. Friedman overall test
+#    This is the actual overall entry test for the paired three-site design
 # =========================================================
-message("开始进行 Friedman overall 检验 ...")
+message("Starting the Friedman overall test ...")
 
 safe_friedman <- function(df_one_genus) {
   df_one_genus <- df_one_genus %>%
@@ -404,9 +404,9 @@ overall_sig_tbl <- overall_tbl %>%
   arrange(q_friedman, p_friedman)
 
 # =========================================================
-# 11. overall 显著菌做配对 Wilcoxon
+# 11. Run paired Wilcoxon tests for genera significant in the overall test
 # =========================================================
-message("开始对 overall 显著菌进行配对 Wilcoxon ...")
+message("Starting paired Wilcoxon tests for genera significant in the overall test ...")
 
 safe_paired_wilcox <- function(x, y) {
   ok <- complete.cases(x, y)
@@ -424,7 +424,7 @@ safe_paired_wilcox <- function(x, y) {
 }
 
 if (nrow(overall_sig_tbl) == 0) {
-  message("当前阈值下没有 Friedman overall 显著 genus，跳过 pairwise Wilcoxon。")
+  message("No Friedman overall significant genera were found at the current threshold; pairwise Wilcoxon tests were skipped.")
   pairwise_tbl <- data.frame(
     Genus = character(0),
     p_RI = numeric(0),
@@ -465,70 +465,70 @@ if (nrow(overall_sig_tbl) == 0) {
 }
 
 # =========================================================
-# 12. 空间分层模式分类函数
+# 12. Spatial stratification pattern-classification function
 # =========================================================
 classify_pattern <- function(mR, mI, mC, sig_RI, sig_RC, sig_IC) {
   
   dir_string <- paste(names(sort(c(Rum = mR, Ile = mI, Col = mC), decreasing = TRUE)), collapse = " > ")
   
-  # 前后肠协同型：Rum ≈ Col，高于或低于 Ile
+  # Foregut-hindgut coordinated pattern: Rum ≈ Col, higher or lower than Ile
   if (!sig_RC && sig_RI && sig_IC) {
     if (mR > mI && mC > mI) {
-      return(c("前后肠协同型", "前后肠协同高型", "Rum ≈ Col > Ile"))
+      return(c("Foregut-hindgut coordinated pattern", "Foregut-hindgut coordinated high pattern", "Rum ≈ Col > Ile"))
     }
     if (mR < mI && mC < mI) {
-      return(c("前后肠协同型", "前后肠协同低型", "Rum ≈ Col < Ile"))
+      return(c("Foregut-hindgut coordinated pattern", "Foregut-hindgut coordinated low pattern", "Rum ≈ Col < Ile"))
     }
   }
   
-  # 回肠独高 / 独低
+  # Ileum-only high / low
   if (sig_RI && sig_IC) {
     if (mI > mR && mI > mC) {
-      return(c("小肠过渡型", "回肠独高型", dir_string))
+      return(c("Small-intestine transitional pattern", "Ileum-only high pattern", dir_string))
     }
     if (mI < mR && mI < mC) {
-      return(c("小肠过渡型", "回肠独低型", dir_string))
+      return(c("Small-intestine transitional pattern", "Ileum-only low pattern", dir_string))
     }
   }
   
-  # 梯度下降型 Rum > Ile > Col
+  # Decreasing gradient pattern: Rum > Ile > Col
   if (mR > mI && mI > mC) {
     if (sig_RC && (sig_RI || sig_IC)) {
-      return(c("梯度型", "梯度下降型", "Rum > Ile > Col"))
+      return(c("Gradient pattern", "Decreasing gradient pattern", "Rum > Ile > Col"))
     }
   }
   
-  # 梯度上升型 Col > Ile > Rum
+  # Increasing gradient pattern: Col > Ile > Rum
   if (mC > mI && mI > mR) {
     if (sig_RC && (sig_RI || sig_IC)) {
-      return(c("梯度型", "梯度上升型", "Col > Ile > Rum"))
+      return(c("Gradient pattern", "Increasing gradient pattern", "Col > Ile > Rum"))
     }
   }
   
-  # 前肠偏高型
+  # Foregut-enriched pattern
   if (mR > mI && mR > mC && sig_RI && sig_RC) {
     if (!sig_IC) {
-      return(c("前肠偏高型", "前肠高-其余接近型", "Rum > Ile ≈ Col"))
+      return(c("Foregut-enriched pattern", "Foregut-high with similar remaining sites", "Rum > Ile ≈ Col"))
     } else {
-      return(c("前肠偏高型", "前肠高-分层型", dir_string))
+      return(c("Foregut-enriched pattern", "Foregut-high stratified pattern", dir_string))
     }
   }
   
-  # 后肠偏高型
+  # Hindgut-enriched pattern
   if (mC > mR && mC > mI && sig_RC && sig_IC) {
     if (!sig_RI) {
-      return(c("后肠偏高型", "后肠高-其余接近型", "Col > Ile ≈ Rum"))
+      return(c("Hindgut-enriched pattern", "Hindgut-high with similar remaining sites", "Col > Ile ≈ Rum"))
     } else {
-      return(c("后肠偏高型", "后肠高-分层型", dir_string))
+      return(c("Hindgut-enriched pattern", "Hindgut-high stratified pattern", dir_string))
     }
   }
   
-  # 复杂型
-  return(c("复杂型/未定型", "复杂型/未定型", dir_string))
+  # Complex pattern
+  return(c("Complex/undetermined pattern", "Complex/undetermined pattern", dir_string))
 }
 
 # =========================================================
-# 13. 合并并分类
+# 13. Merge and classify
 # =========================================================
 pattern_tbl <- overall_sig_tbl %>%
   left_join(pairwise_tbl, by = "Genus") %>%
@@ -561,7 +561,7 @@ pattern_tbl <- overall_sig_tbl %>%
   arrange(pattern_class, pattern_subclass, q_friedman, p_friedman)
 
 # =========================================================
-# 14. 汇总表
+# 14. Summary tables
 # =========================================================
 pattern_summary_subclass_tbl <- pattern_tbl %>%
   count(pattern_class, pattern_subclass, name = "n_genus") %>%
@@ -578,7 +578,7 @@ pattern_top_tbl <- pattern_tbl %>%
   slice_head(n = top_n_each_subclass) %>%
   ungroup()
 
-# 全部 genus 基础表
+# Basic table for all genera
 all_genus_desc_tbl <- pattern_base_tbl %>%
   left_join(prev_df, by = "Genus") %>%
   left_join(tax_df, by = "Genus") %>%
@@ -590,7 +590,7 @@ all_genus_desc_tbl <- pattern_base_tbl %>%
   arrange(Genus)
 
 # =========================================================
-# 15. 保存结果
+# 15. Save results
 # =========================================================
 write.xlsx(
   qc_sample_alignment,
@@ -664,7 +664,7 @@ write.xlsx(
   rowNames = FALSE
 )
 
-# 总工作簿
+# Combined workbook
 wb <- createWorkbook()
 
 addWorksheet(wb, "QC_sample_alignment")
@@ -710,17 +710,17 @@ saveWorkbook(
 )
 
 # =========================================================
-# 16. 控制台摘要输出
+# 16. Console summary output
 # =========================================================
-cat("\n================ 分析完成 ================\n")
-cat("输出目录：", out_dir, "\n")
-cat("原始 genus 数：", ntaxa(ps), "\n")
-cat("Friedman overall 显著 genus 数（q <= ", overall_q_cut, "）：", nrow(overall_sig_tbl), "\n", sep = "")
+cat("\n================ Analysis completed ================\n")
+cat("Output directory: ", out_dir, "\n")
+cat("Raw genus count: ", ntaxa(ps), "\n")
+cat("Number of Friedman overall significant genera (q <= ", overall_q_cut, "): ", nrow(overall_sig_tbl), "\n", sep = "")
 
-cat("\n各大类模式数量：\n")
+cat("\nCounts for major pattern categories:\n")
 print(pattern_summary_class_tbl)
 
-cat("\n主要输出文件：\n")
+cat("\nMain output files:\n")
 cat("03_ANCOMBC2_raw_results_all_genus.xlsx\n")
 cat("04_ANCOMBC2_main_results_cleaned.xlsx\n")
 cat("05_Friedman_overall_all_genus.xlsx\n")

@@ -178,15 +178,15 @@ col_source_text <- c(
   "Col" = "#6E859C"
 )
 
-## 接近旧脚本
+## Close to the previous script
 col_dir_line <- c(
   "positive" = "#C98A7D",
   "negative" = "#7FA6C9"
 )
 
 col_model <- c(
-  "A_模型成立_可作为主体解释" = "#CBB7A7",
-  "B_模型基本成立_可辅助解释" = "#DDD5CD"
+  "A_model_supported_primary_interpretation" = "#CBB7A7",
+  "B_model_partly_supported_secondary_interpretation" = "#DDD5CD"
 )
 
 col_liver_node <- "#E8E1D9"
@@ -245,7 +245,7 @@ p1 <- ggplot(fig1_df, aes(x = trait_liver_corr, y = Trait_show)) +
   ) +
   geom_text(
     aes(label = sprintf("%.3f", trait_liver_corr)),
-    nudge_x = 0.040,   ## 再往右
+    nudge_x = 0.040,   ## further to the right
     size = 3.6,
     family = base_family,
     colour = "#333333"
@@ -253,8 +253,8 @@ p1 <- ggplot(fig1_df, aes(x = trait_liver_corr, y = Trait_show)) +
   scale_fill_manual(
     values = col_model,
     labels = c(
-      "A_模型成立_可作为主体解释" = "Level A",
-      "B_模型基本成立_可辅助解释" = "Level B"
+      "A_model_supported_primary_interpretation" = "Level A",
+      "B_model_partly_supported_secondary_interpretation" = "Level B"
     )
   ) +
   scale_x_continuous(
@@ -284,7 +284,7 @@ save_pdf_editable(
 ## single-trait network, old-style logic
 ############################
 
-## 这里直接写纯色值，避免 names 对不上
+## Use direct color values here to avoid name mismatches
 line_col_positive <- "#C98A7D"
 line_col_negative <- "#7FA6C9"
 
@@ -600,7 +600,7 @@ plot_trait_network <- function(dat_trait, trait_name,
   p
 }
 
-## 单图
+## Single figure
 p2_glu  <- plot_trait_network(core_main, "GLU",        n_rum = 2, n_ile = 0, n_col = 5, show_column_titles = TRUE, show_legend = TRUE)
 p2_tba  <- plot_trait_network(core_main, "TBA",        n_rum = 5, n_ile = 0, n_col = 5, show_column_titles = TRUE, show_legend = TRUE)
 p2_tail <- plot_trait_network(core_main, "TailFat_g",  n_rum = 4, n_ile = 1, n_col = 5, show_column_titles = TRUE, show_legend = TRUE)
@@ -611,13 +611,13 @@ save_pdf_editable(p2_tba,  file.path(outdir, "Fig2_network_TBA.pdf"),      width
 save_pdf_editable(p2_tail, file.path(outdir, "Fig2_network_TailFat.pdf"),  width = 8.2, height = 6.8)
 save_pdf_editable(p2_tg,   file.path(outdir, "Fig2_network_TG.pdf"),       width = 8.2, height = 6.8)
 
-## 拼版：子图都不带图例
+## Composite layout: subplots without legends
 p2_glu_c  <- plot_trait_network(core_main, "GLU",       n_rum = 2, n_ile = 0, n_col = 5, show_column_titles = TRUE,  show_legend = FALSE)
 p2_tba_c  <- plot_trait_network(core_main, "TBA",       n_rum = 5, n_ile = 0, n_col = 5, show_column_titles = TRUE,  show_legend = FALSE)
 p2_tail_c <- plot_trait_network(core_main, "TailFat_g", n_rum = 4, n_ile = 1, n_col = 5, show_column_titles = FALSE, show_legend = FALSE)
 p2_tg_c   <- plot_trait_network(core_main, "TG",        n_rum = 5, n_ile = 0, n_col = 5, show_column_titles = FALSE, show_legend = FALSE)
 
-## 单独做一个完整图例
+## Create one complete standalone legend
 legend_fill_plot <- ggplot(
   tibble(
     x = 1:3,

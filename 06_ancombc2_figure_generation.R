@@ -1,5 +1,5 @@
 ############################################################
-# 输出：
+# Output:
 # 01_pattern_phylum_stacked_no_other_with_IT_0.001.pdf
 # 02_selected_genus_paired_trajectory_0.001.pdf
 # 03_overall_sig_genus_detection_venn_0.001.pdf
@@ -50,7 +50,7 @@ dir.create(out_dir, recursive = TRUE, showWarnings = FALSE)
 need_files <- c(overall_sig_fp, pairwise_fp, main_tbl_fp, abund_fp, meta_fp)
 miss_files <- need_files[!file.exists(need_files)]
 if (length(miss_files) > 0) {
-  stop("以下文件不存在，请检查路径：\n", paste(miss_files, collapse = "\n"))
+  stop("The following files do not exist; please check the paths:\n", paste(miss_files, collapse = "\n"))
 }
 
 ############################
@@ -70,17 +70,17 @@ col_median   <- "#4F4F4F"
 
 # pattern CN / EN
 pattern_order_cn <- c(
-  "前肠偏高型", "小肠过渡型", "后肠偏高型",
-  "前后肠协同型", "梯度型", "复杂型/未定型"
+  "Foregut-enriched", "Ileal-transition", "Hindgut-enriched",
+  "Foregut-hindgut coordinated", "Gradient", "Complex/undetermined"
 )
 
 pattern_label_en <- c(
-  "前肠偏高型"   = "Foregut-enriched",
-  "小肠过渡型"   = "Ileal-transition",
-  "后肠偏高型"   = "Hindgut-enriched",
-  "前后肠协同型" = "Foregut-hindgut coordinated",
-  "梯度型"       = "Gradient",
-  "复杂型/未定型" = "Complex/other"
+  "Foregut-enriched"   = "Foregut-enriched",
+  "Ileal-transition"   = "Ileal-transition",
+  "Hindgut-enriched"   = "Hindgut-enriched",
+  "Foregut-hindgut coordinated" = "Foregut-hindgut coordinated",
+  "Gradient"       = "Gradient",
+  "Complex/undetermined" = "Complex/other"
 )
 
 pattern_order_en <- c(
@@ -95,26 +95,26 @@ pattern_order_en <- c(
 # Fig2 fixed 8 genera
 traj_genus_tbl <- tibble::tribble(
   ~Genus,             ~Pattern,
-  "Prevotella_7",     "前肠偏高型",
-  "Butyrivibrio",     "前肠偏高型",
-  "Fournierella",     "后肠偏高型",
-  "Treponema",        "后肠偏高型",
-  "Anaerovibrio",     "前后肠协同型",
-  "Ruminococcus",     "前后肠协同型",
-  "Succiniclasticum", "梯度型",
-  "Romboutsia",       "梯度型"
+  "Prevotella_7",     "Foregut-enriched",
+  "Butyrivibrio",     "Foregut-enriched",
+  "Fournierella",     "Hindgut-enriched",
+  "Treponema",        "Hindgut-enriched",
+  "Anaerovibrio",     "Foregut-hindgut coordinated",
+  "Ruminococcus",     "Foregut-hindgut coordinated",
+  "Succiniclasticum", "Gradient",
+  "Romboutsia",       "Gradient"
 )
 
 pattern_abbr_map <- c(
-  "前肠偏高型"   = "FGH",
-  "小肠过渡型"   = "IT",
-  "后肠偏高型"   = "HGH",
-  "前后肠协同型" = "FHC",
-  "梯度型"       = "Grad",
-  "复杂型/未定型" = "Other"
+  "Foregut-enriched"   = "FGH",
+  "Ileal-transition"   = "IT",
+  "Hindgut-enriched"   = "HGH",
+  "Foregut-hindgut coordinated" = "FHC",
+  "Gradient"       = "Grad",
+  "Complex/undetermined" = "Other"
 )
 
-# Fig1 phylum colors（不含 Other）
+# Fig. 1 phylum colors (excluding Other)
 phylum_cols <- c(
   "Firmicutes" = "#8FB9A8",
   "Bacteroidota" = "#D8B77E",
@@ -201,7 +201,7 @@ main_tbl_001 <- main_tbl %>%
   ) %>%
   mutate(
     pattern_class_cn = dplyr::case_when(
-      is.na(pattern_class) ~ "复杂型/未定型",
+      is.na(pattern_class) ~ "Complex/undetermined",
       TRUE ~ as.character(pattern_class)
     ),
     pattern_class_en = unname(pattern_label_en[pattern_class_cn]),
@@ -217,7 +217,7 @@ sig_genus_001 <- unique(main_tbl_001$Genus)
 
 traj_missing <- setdiff(traj_genus_tbl$Genus, sig_genus_001)
 if (length(traj_missing) > 0) {
-  warning("以下图2候选菌未进入0.001主分析集：\n", paste(traj_missing, collapse = ", "))
+  warning("The following Fig. 2 candidate genera were not included in the q < 0.001 main analysis set:\n", paste(traj_missing, collapse = ", "))
 }
 
 traj_genus_use <- traj_genus_tbl %>%
@@ -233,7 +233,7 @@ traj_genus_use <- traj_genus_tbl %>%
 ############################
 sample_cols <- intersect(colnames(abund_df), meta_df$SampleID)
 if (length(sample_cols) == 0) {
-  stop("丰度表与 metadata 没有匹配到样本列，请检查 SampleID。")
+  stop("No sample columns matched between the abundance table and metadata; please check SampleID.")
 }
 
 abund_df2 <- abund_df %>%
@@ -257,7 +257,7 @@ rel_long <- as.data.frame(rel_mat) %>%
   )
 
 ############################
-# 7. Fig1: pattern × phylum stacked bar（加入 IT，去掉 Other）
+# 7. Fig. 1: pattern-by-phylum stacked bar (including IT and excluding Other)
 ############################
 fig1_use_patterns <- c(
   "Foregut-enriched",
@@ -368,12 +368,12 @@ save_pdf(p_fig2, "02_selected_genus_paired_trajectory_0.001.pdf", width = 13.4, 
 
 ############################
 # 9. Fig3: Venn of overall significant genera by detection
-# 定义：
-# R 集合 = overall显著菌中，在 Rum 任一样本中 abundance > 0 的 genus
-# I 集合 = overall显著菌中，在 Ile 任一样本中 abundance > 0 的 genus
-# C 集合 = overall显著菌中，在 Col 任一样本中 abundance > 0 的 genus
-# 因此：
-# R-only = 仅在 Rum 检出；I、Col 均未检出
+# Definition:
+# R set = genera among overall significant taxa with abundance > 0 in any Rum sample
+# I set = genera among overall significant taxa with abundance > 0 in any Ile sample
+# C set = genera among overall significant taxa with abundance > 0 in any Col sample
+# Therefore:
+# R-only = detected only in Rum and not detected in Ile or Col
 ############################
 overall_abund_long <- abund_df2 %>%
   filter(Genus %in% sig_genus_001) %>%
@@ -399,10 +399,10 @@ set_R <- detect_tbl %>% filter(Rum) %>% pull(Genus) %>% unique()
 set_I <- detect_tbl %>% filter(Ile) %>% pull(Genus) %>% unique()
 set_C <- detect_tbl %>% filter(Col) %>% pull(Genus) %>% unique()
 
-# 颜色：温和
+# Colors: soft palette
 venn_fill_cols <- c("#7BA8A3", "#E6C39A", "#C98D7A")
 
-# 比例：接近正方形，更自然
+# Aspect ratio: close to square for a more balanced layout
 venn_width  <- 7.2
 venn_height <- 6.6
 
@@ -418,10 +418,10 @@ venn_grob <- VennDiagram::venn.diagram(
   alpha = c(0.45, 0.45, 0.45),
   col = c("#5F8F89", "#D2AE78", "#B77766"),
   lwd = 1.2,
-  cex = 1.8,                # 交集数字大小
+  cex = 1.8,                # intersection-number size
   fontfamily = base_family,
   fontface = "plain",
-  cat.cex = 1.6,            # 集合名大小
+  cat.cex = 1.6,            # set-name size
   cat.fontfamily = base_family,
   cat.fontface = "plain",
   cat.dist = c(0.055, 0.055, 0.055),
@@ -442,9 +442,9 @@ dev.off()
 ############################
 # 11. console message
 ############################
-cat("\n================ 已完成 =================\n")
-cat("输出目录：", out_dir, "\n")
-cat("共输出文件：\n")
+cat("\n================ Completed =================\n")
+cat("Output directory: ", out_dir, "\n")
+cat("Output files:\n")
 cat("01_pattern_phylum_stacked_no_other_with_IT_0.001.pdf\n")
 cat("02_selected_genus_paired_trajectory_0.001.pdf\n")
 cat("03_overall_sig_genus_detection_venn_0.001.pdf\n")

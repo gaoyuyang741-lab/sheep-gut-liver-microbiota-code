@@ -4,7 +4,7 @@ rm(list = ls())
 options(stringsAsFactors = FALSE)
 
 ############################
-## 0. 安装 / 加载包
+## 0. Install / load packages
 ############################
 pkg_needed <- c(
   "readxl", "openxlsx", "dplyr", "tibble", "stringr",
@@ -19,7 +19,7 @@ if (length(pkg_new) > 0) {
 invisible(lapply(pkg_needed, library, character.only = TRUE))
 
 ############################
-## 1. 路径设置
+## 1. Path settings
 ############################
 # Input and output directories
 # Please place the required cross-compartment coordinated genera input files in "data/coordinated_genera/input".
@@ -34,30 +34,30 @@ rum_fp <- file.path(base_dir, "Rum_genus_abundance.xlsx")
 ile_fp <- file.path(base_dir, "Ile_genus_abundance.xlsx")
 col_fp <- file.path(base_dir, "Colon_genus_abundance.xlsx")
 
-process_xlsx <- file.path(out_dir, "01_连续性结构分析_过程文件.xlsx")
-result_xlsx  <- file.path(out_dir, "02_连续性结构分析_结果文件.xlsx")
+process_xlsx <- file.path(out_dir, "01_continuity_structure_analysis_process_file.xlsx")
+result_xlsx  <- file.path(out_dir, "02_continuity_structure_analysis_result_file.xlsx")
 
 ############################
-## 2. 参数设置
+## 2. Parameter settings
 ############################
-# 基准阈值：至少一个部位 prevalence >= 0.5
+# Baseline threshold: prevalence >= 0.5 in at least one compartment
 prevalence_core_cut <- 0.50
 
-# 另一端可追踪阈值：prevalence >= 0.2 或 非零样本数 >= 6
+# Traceability threshold for the other end: prevalence >= 0.2 or nonzero sample count >= 6
 prevalence_trace_cut <- 0.20
 nonzero_trace_cut    <- 6
 
-# 显著性阈值
+# Significance threshold
 q_cut_main <- 0.05
 
-# 强相关阈值
+# Strong-correlation threshold
 abs_r_cut_strict <- 0.30
 
-# 第三配对“支持证据”阈值
+# Supporting-evidence threshold for the third pair
 abs_r_cut_support <- 0.20
 
 ############################
-## 3. 基础函数
+## 3. Basic functions
 ############################
 
 clean_sample_id <- function(x) {
@@ -72,7 +72,7 @@ read_genus_table <- function(fp, sheet = 1) {
   df <- as.data.frame(df)
   
   if (!"Genus" %in% colnames(df)) {
-    stop("文件中未找到 'Genus' 列：", fp)
+    stop("No 'Genus' column was found in file: ", fp)
   }
   
   df <- df[!is.na(df$Genus) & df$Genus != "", , drop = FALSE]
@@ -86,7 +86,7 @@ read_genus_table <- function(fp, sheet = 1) {
   }
   df[is.na(df)] <- 0
   
-  # 合并同名 genus
+  # Merge duplicated genus names
   df <- df |>
     dplyr::group_by(Genus) |>
     dplyr::summarise(dplyr::across(dplyr::everything(), ~sum(.x, na.rm = TRUE)), .groups = "drop")
@@ -119,7 +119,7 @@ filter_single_site_core <- function(mat, prevalence_core_cut = 0.5) {
 
 clr_transform_czm <- function(mat_genus_by_sample) {
   if (nrow(mat_genus_by_sample) < 2) {
-    stop("过滤后 genus 数 < 2，无法做 CLR。")
+    stop("Fewer than two genera remained after filtering; CLR cannot be performed.")
   }
   
   x <- t(mat_genus_by_sample)  # sample x genus
@@ -149,7 +149,7 @@ align_two_blocks <- function(df_x, df_y) {
   
   common_ids <- intersect(df_x$SampleID, df_y$SampleID)
   if (length(common_ids) < 3) {
-    stop("共同样本数过少，无法分析。")
+    stop("Too few common samples for analysis.")
   }
   
   df_x2 <- df_x |>
@@ -161,7 +161,7 @@ align_two_blocks <- function(df_x, df_y) {
     dplyr::arrange(SampleID)
   
   if (!identical(df_x2$SampleID, df_y2$SampleID)) {
-    stop("样本对齐失败。")
+    stop("Sample alignment failed.")
   }
   
   list(x = df_x2, y = df_y2, common_ids = common_ids)
@@ -200,14 +200,14 @@ get_pair_entry_table <- function(stats1, stats2,
   out$trace_1 <- (out$prevalence_1 >= prevalence_trace_cut) | (out$nonzero_n_1 >= nonzero_trace_cut)
   out$trace_2 <- (out$prevalence_2 >= prevalence_trace_cut) | (out$nonzero_n_2 >= nonzero_trace_cut)
   
-  # 至少一端是核心，另一端可追踪
+  # At least one end is core and the other end is traceable
   out$pass_pair_entry <- (out$core_1 & out$trace_2) | (out$core_2 & out$trace_1)
   
   out$entry_type <- dplyr::case_when(
-    out$core_1 & out$core_2 ~ paste0(site1, "_核心 + ", site2, "_核心"),
-    out$core_1 & !out$core_2 & out$trace_2 ~ paste0(site1, "_核心 + ", site2, "_可追踪"),
-    !out$core_1 & out$core_2 & out$trace_1 ~ paste0(site2, "_核心 + ", site1, "_可追踪"),
-    TRUE ~ "未进入分析"
+    out$core_1 & out$core_2 ~ paste0(site1, "_core + ", site2, "_core"),
+    out$core_1 & !out$core_2 & out$trace_2 ~ paste0(site1, "_core + ", site2, "_traceable"),
+    !out$core_1 & out$core_2 & out$trace_1 ~ paste0(site2, "_core + ", site1, "_traceable"),
+    TRUE ~ "not included in analysis"
   )
   
   out
@@ -231,7 +231,7 @@ calc_pair_correlations <- function(df_x, df_y, entry_df, pair_name,
     dplyr::filter(Genus %in% common_genus)
   
   if (nrow(entry_df2) == 0) {
-    stop(pair_name, "：按新进入规则过滤后无可分析 genus。")
+    stop(pair_name, ": no analyzable genus remained after applying the new inclusion rules.")
   }
   
   res_list <- vector("list", nrow(entry_df2))
@@ -285,47 +285,47 @@ calc_pair_correlations <- function(df_x, df_y, entry_df, pair_name,
   res <- res |>
     dplyr::left_join(entry_df2, by = "Genus")
   
-  # 主分析方向
+  # Main-analysis direction
   res$main_direction <- ifelse(
     is.na(res$r_main), NA,
-    ifelse(res$r_main > 0, "同向",
-           ifelse(res$r_main < 0, "替代", "零相关"))
+    ifelse(res$r_main > 0, "positive",
+           ifelse(res$r_main < 0, "substitution", "zero correlation"))
   )
   
-  # 敏感性方向
+  # Sensitivity-analysis direction
   res$sens_direction <- ifelse(
     is.na(res$r_sens), NA,
-    ifelse(res$r_sens > 0, "同向",
-           ifelse(res$r_sens < 0, "替代", "零相关"))
+    ifelse(res$r_sens > 0, "positive",
+           ifelse(res$r_sens < 0, "substitution", "zero correlation"))
   )
   
-  # 严格显著：Pearson q<0.05
+  # Strict significance: Pearson q < 0.05
   res$main_sig <- !is.na(res$q_main) & (res$q_main < q_cut_main)
   
-  # 严格强证据：Pearson q<0.05 且 |r|>=0.3
+  # Strict strong evidence: Pearson q < 0.05 and |r| >= 0.3
   res$main_sig_strict <- !is.na(res$q_main) &
     (res$q_main < q_cut_main) &
     (abs(res$r_main) >= abs_r_cut_strict)
   
-  # 敏感性支持：Spearman方向一致，且 |r|>=0.2
+  # Sensitivity support: Spearman direction is consistent and |r| >= 0.2
   res$sens_support <- !is.na(res$r_sens) & !is.na(res$r_main) &
     (sign(res$r_sens) == sign(res$r_main)) &
     (abs(res$r_sens) >= abs_r_cut_support)
   
-  # 单对连续性证据分级
+  # Evidence grading for each pair
   res$pair_evidence_level <- dplyr::case_when(
-    res$main_sig_strict & res$sens_support ~ "强证据",
-    res$main_sig & res$sens_support ~ "较强证据",
-    res$main_sig & !res$sens_support ~ "主分析证据",
-    !res$main_sig & res$sens_support & !is.na(res$r_main) & (abs(res$r_main) >= abs_r_cut_support) ~ "趋势支持",
-    TRUE ~ "无证据"
+    res$main_sig_strict & res$sens_support ~ "strong evidence",
+    res$main_sig & res$sens_support ~ "relatively strong evidence",
+    res$main_sig & !res$sens_support ~ "main-analysis evidence",
+    !res$main_sig & res$sens_support & !is.na(res$r_main) & (abs(res$r_main) >= abs_r_cut_support) ~ "trend support",
+    TRUE ~ "no evidence"
   )
   
-  # 单对连续性类型
+  # Continuity type for each pair
   res$continuity_type <- dplyr::case_when(
-    res$pair_evidence_level != "无证据" & res$r_main > 0 ~ "同向连续型",
-    res$pair_evidence_level != "无证据" & res$r_main < 0 ~ "替代连续型",
-    TRUE ~ "未定"
+    res$pair_evidence_level != "no evidence" & res$r_main > 0 ~ "positive-continuity type",
+    res$pair_evidence_level != "no evidence" & res$r_main < 0 ~ "substitution-continuity type",
+    TRUE ~ "undetermined"
   )
   
   res <- res |>
@@ -344,10 +344,10 @@ make_pair_summary <- function(res_df, pair_name) {
   data.frame(
     pair = pair_name,
     total_tested_genus = nrow(res_df),
-    strong_evidence = sum(res_df$pair_evidence_level == "强证据", na.rm = TRUE),
-    relatively_strong_evidence = sum(res_df$pair_evidence_level == "较强证据", na.rm = TRUE),
-    main_only_evidence = sum(res_df$pair_evidence_level == "主分析证据", na.rm = TRUE),
-    trend_support = sum(res_df$pair_evidence_level == "趋势支持", na.rm = TRUE),
+    strong_evidence = sum(res_df$pair_evidence_level == "strong evidence", na.rm = TRUE),
+    relatively_strong_evidence = sum(res_df$pair_evidence_level == "relatively strong evidence", na.rm = TRUE),
+    main_only_evidence = sum(res_df$pair_evidence_level == "main-analysis evidence", na.rm = TRUE),
+    trend_support = sum(res_df$pair_evidence_level == "trend support", na.rm = TRUE),
     main_sig_total = nrow(sig_all),
     main_sig_strict = nrow(sig_strict),
     same_direction_main = sum(sig_all$r_main > 0, na.rm = TRUE),
@@ -410,19 +410,19 @@ classify_structure_across_three <- function(pattern_df) {
   )
   
   pattern_df$structure_grade <- dplyr::case_when(
-    pattern_df$triple_strict_support & pattern_df$all_same_sign_available ~ "三部位贯通强证据",
-    pattern_df$triple_main_support & pattern_df$all_same_sign_available ~ "三部位贯通主证据",
-    pattern_df$two_main_one_trend ~ "三部位贯通支持证据",
-    pattern_df$sig_RI_main & pattern_df$sig_RC_main & !pattern_df$sig_IC_main ~ "瘤胃双连接证据",
-    pattern_df$sig_RI_main & pattern_df$sig_IC_main & !pattern_df$sig_RC_main ~ "回肠桥接证据",
-    pattern_df$sig_RC_main & pattern_df$sig_IC_main & !pattern_df$sig_RI_main ~ "后肠双连接证据",
-    pattern_df$sig_RI_strict & !pattern_df$sig_RC_main & !pattern_df$sig_IC_main ~ "前段连续强证据",
-    pattern_df$sig_RC_strict & !pattern_df$sig_RI_main & !pattern_df$sig_IC_main ~ "前后呼应强证据",
-    pattern_df$sig_IC_strict & !pattern_df$sig_RI_main & !pattern_df$sig_RC_main ~ "后段连续强证据",
-    pattern_df$sig_RI_main & !pattern_df$sig_RC_main & !pattern_df$sig_IC_main ~ "前段连续主证据",
-    pattern_df$sig_RC_main & !pattern_df$sig_RI_main & !pattern_df$sig_IC_main ~ "前后呼应主证据",
-    pattern_df$sig_IC_main & !pattern_df$sig_RI_main & !pattern_df$sig_RC_main ~ "后段连续主证据",
-    TRUE ~ "未形成明确结构证据"
+    pattern_df$triple_strict_support & pattern_df$all_same_sign_available ~ "three-compartment continuity: strong evidence",
+    pattern_df$triple_main_support & pattern_df$all_same_sign_available ~ "three-compartment continuity: main evidence",
+    pattern_df$two_main_one_trend ~ "three-compartment continuity: supporting evidence",
+    pattern_df$sig_RI_main & pattern_df$sig_RC_main & !pattern_df$sig_IC_main ~ "rumen dual-link evidence",
+    pattern_df$sig_RI_main & pattern_df$sig_IC_main & !pattern_df$sig_RC_main ~ "ileal bridge evidence",
+    pattern_df$sig_RC_main & pattern_df$sig_IC_main & !pattern_df$sig_RI_main ~ "hindgut dual-link evidence",
+    pattern_df$sig_RI_strict & !pattern_df$sig_RC_main & !pattern_df$sig_IC_main ~ "anterior continuity: strong evidence",
+    pattern_df$sig_RC_strict & !pattern_df$sig_RI_main & !pattern_df$sig_IC_main ~ "foregut-hindgut coupling: strong evidence",
+    pattern_df$sig_IC_strict & !pattern_df$sig_RI_main & !pattern_df$sig_RC_main ~ "posterior continuity: strong evidence",
+    pattern_df$sig_RI_main & !pattern_df$sig_RC_main & !pattern_df$sig_IC_main ~ "anterior continuity: main evidence",
+    pattern_df$sig_RC_main & !pattern_df$sig_RI_main & !pattern_df$sig_IC_main ~ "foregut-hindgut coupling: main evidence",
+    pattern_df$sig_IC_main & !pattern_df$sig_RI_main & !pattern_df$sig_RC_main ~ "posterior continuity: main evidence",
+    TRUE ~ "no clear structural evidence"
   )
   
   pattern_df
@@ -541,10 +541,10 @@ make_pattern_table <- function(res_RI, res_RC, res_IC,
     tol <- ifelse(is.finite(tol_base) && tol_base > 0, 0.2 * tol_base, 0)
     
     if (abs(mean_R - mean_C) <= tol && mean_I < mean_R && mean_I < mean_C) {
-      return("瘤胃≈结肠高于回肠")
+      return("Rum ≈ Col higher than Ile")
     }
     if (abs(mean_R - mean_C) <= tol && mean_I > mean_R && mean_I > mean_C) {
-      return("回肠高于瘤胃≈结肠")
+      return("Ile higher than Rum ≈ Col")
     }
     
     paste(ord, collapse = " > ")
@@ -560,10 +560,10 @@ extract_clr_df_by_genus <- function(clr_df, genus_vec) {
 }
 
 ############################
-## 4. 读取数据
+## 4. Read data
 ############################
 cat("======================================\n")
-cat("读取数据...\n")
+cat("Reading data...\n")
 cat("======================================\n")
 
 rum_raw_mat <- read_genus_table(rum_fp, sheet = 1)
@@ -571,10 +571,10 @@ ile_raw_mat <- read_genus_table(ile_fp, sheet = 1)
 col_raw_mat <- read_genus_table(col_fp, sheet = 1)
 
 ############################
-## 5. 样本检查
+## 5. Sample check
 ############################
 cat("======================================\n")
-cat("检查样本列是否一致...\n")
+cat("Checking whether sample columns are consistent...\n")
 cat("======================================\n")
 
 rum_samples <- clean_sample_id(colnames(rum_raw_mat))
@@ -583,7 +583,7 @@ col_samples <- clean_sample_id(colnames(col_raw_mat))
 
 if (!identical(sort(rum_samples), sort(ile_samples)) ||
     !identical(sort(rum_samples), sort(col_samples))) {
-  stop("三个部位样本列不一致，请先检查。")
+  stop("Sample columns are inconsistent across the three compartments; please check first.")
 }
 
 sample_order <- sort(rum_samples)
@@ -592,10 +592,10 @@ ile_raw_mat <- ile_raw_mat[, sample_order, drop = FALSE]
 col_raw_mat <- col_raw_mat[, sample_order, drop = FALSE]
 
 ############################
-## 6. 单部位核心菌过滤（仍以 prevalence 0.5 为基准）
+## 6. Compartment-specific core-genus filtering (still based on prevalence 0.5)
 ############################
 cat("======================================\n")
-cat("单部位核心菌过滤（prevalence >= 0.5）...\n")
+cat("Filtering compartment-specific core genera (prevalence >= 0.5)...\n")
 cat("======================================\n")
 
 rum_core <- filter_single_site_core(rum_raw_mat, prevalence_core_cut = prevalence_core_cut)
@@ -611,11 +611,11 @@ ile_stats_all <- calc_genus_stats(ile_raw_mat)
 col_stats_all <- calc_genus_stats(col_raw_mat)
 
 ############################
-## 7. CLR 变换
-## 注意：仍以单部位核心菌矩阵进入 CLR
+## 7. CLR transformation
+## Note: CLR is still performed using compartment-specific core-genus matrices
 ############################
 cat("======================================\n")
-cat("CZM补零 + CLR...\n")
+cat("CZM zero replacement + CLR...\n")
 cat("======================================\n")
 
 rum_clr <- clr_transform_czm(rum_raw_core)
@@ -627,10 +627,10 @@ ile_clr_df <- clr_mat_to_df(ile_clr)
 col_clr_df <- clr_mat_to_df(col_clr)
 
 ############################
-## 8. 构建三组“单端核心 + 另一端可追踪”进入表
+## 8. Build three inclusion tables using the "one-end core + other-end traceable" rule
 ############################
 cat("======================================\n")
-cat("构建配对进入规则表...\n")
+cat("Building paired inclusion-rule tables...\n")
 cat("======================================\n")
 
 entry_RI <- get_pair_entry_table(
@@ -664,12 +664,12 @@ entry_IC <- get_pair_entry_table(
 )
 
 ############################
-## 9. 配对相关分析
-## 主分析：Pearson
-## 敏感性：Spearman
+## 9. Paired correlation analysis
+## Main analysis: Pearson
+## Sensitivity analysis: Spearman
 ############################
 cat("======================================\n")
-cat("计算配对连续性相关...\n")
+cat("Calculating paired continuity correlations...\n")
 cat("======================================\n")
 
 res_RI <- calc_pair_correlations(
@@ -706,7 +706,7 @@ res_IC <- calc_pair_correlations(
 )
 
 ############################
-## 10. 提取关键结果
+## 10. Extract key results
 ############################
 sig_RI_main <- res_RI |>
   dplyr::filter(main_sig)
@@ -745,10 +745,10 @@ IC_replace <- sig_IC_main |>
   dplyr::filter(r_main < 0)
 
 ############################
-## 11. 三部位结构模式表
+## 11. Three-compartment structural pattern table
 ############################
 cat("======================================\n")
-cat("构建三部位结构模式表...\n")
+cat("Building the three-compartment structural pattern table...\n")
 cat("======================================\n")
 
 pattern_df <- make_pattern_table(
@@ -761,19 +761,19 @@ pattern_df <- make_pattern_table(
 )
 
 core_triple_strong <- pattern_df |>
-  dplyr::filter(structure_grade == "三部位贯通强证据") |>
+  dplyr::filter(structure_grade == "three-compartment continuity: strong evidence") |>
   dplyr::arrange(q_RI, q_RC, q_IC, dplyr::desc(abs_r_RI + abs_r_RC + abs_r_IC))
 
 core_triple_main <- pattern_df |>
-  dplyr::filter(structure_grade == "三部位贯通主证据") |>
+  dplyr::filter(structure_grade == "three-compartment continuity: main evidence") |>
   dplyr::arrange(q_RI, q_RC, q_IC, dplyr::desc(abs_r_RI + abs_r_RC + abs_r_IC))
 
 core_triple_support <- pattern_df |>
-  dplyr::filter(structure_grade == "三部位贯通支持证据") |>
+  dplyr::filter(structure_grade == "three-compartment continuity: supporting evidence") |>
   dplyr::arrange(q_RI, q_RC, q_IC, dplyr::desc(abs_r_RI + abs_r_RC + abs_r_IC))
 
 ############################
-## 12. 摘要统计
+## 12. Summary statistics
 ############################
 summary_pairs <- dplyr::bind_rows(
   make_pair_summary(res_RI, "Rumen_vs_Ileum"),
@@ -788,7 +788,7 @@ summary_pair_signature <- pattern_df |>
   dplyr::count(pair_signature, sort = TRUE, name = "n")
 
 ############################
-## 13. 导出三类三部位核心菌 CLR 矩阵
+## 13. Export CLR matrices for the three categories of three-compartment core genera
 ############################
 triple_strong_genus  <- core_triple_strong$Genus
 triple_main_genus    <- core_triple_main$Genus
@@ -807,10 +807,10 @@ ile_triple_support_clr <- extract_clr_df_by_genus(ile_clr_df, triple_support_gen
 col_triple_support_clr <- extract_clr_df_by_genus(col_clr_df, triple_support_genus)
 
 ############################
-## 14. 写出过程文件
+## 14. Write process file
 ############################
 cat("======================================\n")
-cat("写出过程文件...\n")
+cat("Writing process file...\n")
 cat("======================================\n")
 
 process_list <- list(
@@ -846,10 +846,10 @@ openxlsx::write.xlsx(
 )
 
 ############################
-## 15. 写出结果文件
+## 15. Write result file
 ############################
 cat("======================================\n")
-cat("写出结果文件...\n")
+cat("Writing result file...\n")
 cat("======================================\n")
 
 result_list <- list(
@@ -902,34 +902,34 @@ openxlsx::write.xlsx(
 )
 
 ############################
-## 16. 控制台摘要
+## 16. Console summary
 ############################
 cat("======================================\n")
-cat("分析完成。\n")
-cat("过程文件：", process_xlsx, "\n")
-cat("结果文件：", result_xlsx, "\n")
+cat("Analysis completed.\n")
+cat("Process file: ", process_xlsx, "\n")
+cat("Result file: ", result_xlsx, "\n")
 cat("======================================\n")
 
-cat("单部位核心 genus 数（prevalence >= ", prevalence_core_cut, "）：\n", sep = "")
+cat("Number of compartment-specific core genera (prevalence >= ", prevalence_core_cut, "）：\n", sep = "")
 cat("Rumen :", nrow(rum_raw_core), "\n")
 cat("Ileum :", nrow(ile_raw_core), "\n")
 cat("Colon :", nrow(col_raw_core), "\n\n")
 
-cat("三组进入分析的 genus 数：\n")
+cat("Number of genera included in the three paired analyses:\n")
 cat("Rumen_vs_Ileum :", sum(entry_RI$pass_pair_entry, na.rm = TRUE), "\n")
 cat("Rumen_vs_Colon :", sum(entry_RC$pass_pair_entry, na.rm = TRUE), "\n")
 cat("Ileum_vs_Colon :", sum(entry_IC$pass_pair_entry, na.rm = TRUE), "\n\n")
 
-cat("Pearson 主分析显著 genus 数（q < ", q_cut_main, "）：\n", sep = "")
+cat("Number of genera significant in the Pearson main analysis (q < ", q_cut_main, "）：\n", sep = "")
 cat("Rumen_vs_Ileum :", nrow(sig_RI_main), "\n")
 cat("Rumen_vs_Colon :", nrow(sig_RC_main), "\n")
 cat("Ileum_vs_Colon :", nrow(sig_IC_main), "\n\n")
 
-cat("严格显著 genus 数（q < ", q_cut_main, " 且 |r| >= ", abs_r_cut_strict, "）：\n", sep = "")
+cat("Number of strictly significant genera (q < ", q_cut_main, " and |r| >= ", abs_r_cut_strict, "）：\n", sep = "")
 cat("Rumen_vs_Ileum :", nrow(sig_RI_strict), "\n")
 cat("Rumen_vs_Colon :", nrow(sig_RC_strict), "\n")
 cat("Ileum_vs_Colon :", nrow(sig_IC_strict), "\n\n")
 
-cat("三部位结构分级：\n")
+cat("Three-compartment structural grades:\n")
 print(summary_structure_grade)
 cat("======================================\n")

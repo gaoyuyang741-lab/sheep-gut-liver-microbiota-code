@@ -4,7 +4,7 @@ rm(list = ls())
 options(stringsAsFactors = FALSE, scipen = 999)
 
 ############################
-## 0. 安装 / 加载包
+## 0. Install / load packages
 ############################
 pkg_needed <- c(
   "readxl", "openxlsx", "dplyr", "tibble", "stringr",
@@ -19,7 +19,7 @@ if (length(pkg_new) > 0) {
 invisible(lapply(pkg_needed, library, character.only = TRUE))
 
 ############################
-## 1. 文件路径
+## 1. File paths
 ############################
 # Input and output directories
 # Please place the required input files in "data/pairwise/input".
@@ -33,25 +33,25 @@ dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 rum_fp    <- file.path(base_dir, "Rum_genus_abundance.xlsx")
 ile_fp    <- file.path(base_dir, "Ile_genus_abundance.xlsx")
 col_fp    <- file.path(base_dir, "Colon_genus_abundance.xlsx")
-liver_fp  <- file.path(base_dir, "肝脏筛选基因.xlsx")
+liver_fp  <- file.path(base_dir, "\u809d\u810f\u7b5b\u9009\u57fa\u56e0.xlsx")
 blood_fp  <- file.path(base_dir, "blood_phenotype_sGCCA_input.xlsx")
-tail_fp   <- file.path(base_dir, "尾脂数据_16s编号转换.xlsx")
+tail_fp   <- file.path(base_dir, "\u5c3e\u8102\u6570\u636e_16s\u7f16\u53f7\u8f6c\u6362.xlsx")
 
 ############################
-## 2. 可调参数
+## 2. Tunable parameters
 ############################
 prevalence_cut <- 0.50
-min_nonzero_n  <- NULL   # 如不需要额外限制，保持 NULL
+min_nonzero_n  <- NULL   # Keep NULL if no additional restriction is needed
 
-# 显著性筛选阈值
+# Significance filtering thresholds
 q_cut   <- 0.05
 rho_cut <- 0.30
 
 ############################
-## 3. 基础函数
+## 3. Basic functions
 ############################
 
-# 3.1 样本名统一
+# 3.1 Harmonize sample names
 clean_sample_id <- function(x) {
   x <- as.character(x)
   x <- trimws(x)
@@ -59,7 +59,7 @@ clean_sample_id <- function(x) {
   x
 }
 
-# 3.2 数值 z-score（零方差列设为0）
+# 3.2 Numeric z-score scaling (set zero-variance columns to 0)
 zscore_df <- function(df) {
   out <- as.data.frame(df, check.names = FALSE)
   for (j in seq_len(ncol(out))) {
@@ -75,13 +75,13 @@ zscore_df <- function(df) {
   out
 }
 
-# 3.3 读 genus 丰度表：第一列必须是 Genus，后面是样本列
+# 3.3 Read genus abundance table: the first column must be Genus, followed by sample columns
 read_genus_table <- function(fp, sheet = 1) {
   df <- readxl::read_excel(fp, sheet = sheet)
   df <- as.data.frame(df)
   
   if (!"Genus" %in% colnames(df)) {
-    stop("文件中未找到 'Genus' 列：", fp)
+    stop("No 'Genus' column was found in file: ", fp)
   }
   
   df <- df[!is.na(df$Genus) & df$Genus != "", , drop = FALSE]
@@ -95,7 +95,7 @@ read_genus_table <- function(fp, sheet = 1) {
   }
   df[is.na(df)] <- 0
   
-  # 同名 genus 合并
+  # Merge duplicated genus names
   df <- df |>
     dplyr::group_by(Genus) |>
     dplyr::summarise(dplyr::across(dplyr::everything(), ~sum(.x, na.rm = TRUE)), .groups = "drop")
@@ -104,10 +104,10 @@ read_genus_table <- function(fp, sheet = 1) {
   rownames(mat) <- df$Genus
   mode(mat) <- "numeric"
   
-  return(mat)  # 行=Genus，列=Sample
+  return(mat)  # rows = Genus, columns = Sample
 }
 
-# 3.4 prevalence 过滤（按原始丰度 >0 的样本比例）
+# 3.4 Prevalence filtering (proportion of samples with raw abundance > 0)
 prevalence_filter <- function(mat, prevalence_cut = 0.30, min_nonzero_n = NULL) {
   prev <- rowMeans(mat > 0, na.rm = TRUE)
   nonzero_n <- rowSums(mat > 0, na.rm = TRUE)
@@ -132,14 +132,14 @@ prevalence_filter <- function(mat, prevalence_cut = 0.30, min_nonzero_n = NULL) 
   )
 }
 
-# 3.5 CZM补零 + CLR
-# genus x sample -> t() -> cmultRepl(CZM) -> clr -> 保持 sample x genus
+# 3.5 CZM zero replacement + CLR
+# genus x sample -> t() -> cmultRepl(CZM) -> clr -> keep sample x genus
 clr_transform_czm <- function(mat_genus_by_sample) {
   if (nrow(mat_genus_by_sample) < 2) {
-    stop("过滤后特征数 < 2，无法做 CLR。请放宽 prevalence_cut。")
+    stop("Fewer than two features remained after filtering; CLR cannot be performed. Please relax prevalence_cut.")
   }
   
-  x <- t(mat_genus_by_sample)  # 行=样本，列=genus
+  x <- t(mat_genus_by_sample)  # rows = samples, columns = genus
   
   x_nozero <- zCompositions::cmultRepl(
     X = x,
@@ -151,10 +151,10 @@ clr_transform_czm <- function(mat_genus_by_sample) {
   x_clr <- compositions::clr(x_nozero, base = exp(1))
   x_clr <- as.matrix(x_clr)
   
-  return(x_clr)  # 行=样本，列=genus
+  return(x_clr)  # rows = samples, columns = genus
 }
 
-# 3.6 读取 blood
+# 3.6 Read blood data
 read_blood_traits <- function(fp) {
   df <- readxl::read_excel(fp, sheet = "selected_raw_table")
   df <- as.data.frame(df, stringsAsFactors = FALSE)
@@ -162,7 +162,7 @@ read_blood_traits <- function(fp) {
   need_cols <- c("Sample16S", "TC", "TG", "LDL", "TBA", "GLU")
   miss_cols <- setdiff(need_cols, colnames(df))
   if (length(miss_cols) > 0) {
-    stop("blood 文件缺少列：", paste(miss_cols, collapse = ", "))
+    stop("The blood file is missing columns: ", paste(miss_cols, collapse = ", "))
   }
   
   out <- df[, need_cols, drop = FALSE]
@@ -181,13 +181,13 @@ read_blood_traits <- function(fp) {
   out
 }
 
-# 3.7 读取 liver formal log2TPM
+# 3.7 Read liver formal log2TPM
 read_liver_strict <- function(fp) {
   df <- readxl::read_excel(fp, sheet = "formal_log2TPM", skip = 1)
   df <- as.data.frame(df, stringsAsFactors = FALSE)
   
   if (!"Gene" %in% colnames(df)) {
-    stop("liver formal_log2TPM 文件中未找到 'Gene' 列。")
+    stop("No 'Gene' column was found in the liver formal_log2TPM file.")
   }
   
   df <- df[!is.na(df$Gene) & df$Gene != "", , drop = FALSE]
@@ -200,7 +200,7 @@ read_liver_strict <- function(fp) {
     df[[cc]] <- suppressWarnings(as.numeric(df[[cc]]))
   }
   
-  # 同名基因如有重复，取均值
+  # If duplicated gene names exist, use the mean
   df <- df |>
     dplyr::group_by(Gene) |>
     dplyr::summarise(dplyr::across(dplyr::everything(), ~mean(.x, na.rm = TRUE)), .groups = "drop")
@@ -209,22 +209,22 @@ read_liver_strict <- function(fp) {
   rownames(mat) <- df$Gene
   mode(mat) <- "numeric"
   
-  # 转成 sample x gene
+  # Convert to sample x gene
   mat <- t(mat)
   
   as.data.frame(mat, check.names = FALSE) |>
     tibble::rownames_to_column("SampleID")
 }
 
-# 3.8 读取 tailfat（表头从第5行开始）
+# 3.8 Read tailfat data (header starts from row 5)
 read_tailfat_traits <- function(fp) {
-  df <- readxl::read_excel(fp, sheet = "尾脂_16s编号", skip = 4)
+  df <- readxl::read_excel(fp, sheet = "\u5c3e\u8102_16s\u7f16\u53f7", skip = 4)
   df <- as.data.frame(df, stringsAsFactors = FALSE)
   
-  need_cols <- c("瘤胃和肠道16s编号", "尾脂g", "尾脂/胴体重g/kg", "尾脂/宰前活重g/kg")
+  need_cols <- c("\u7624\u80c3\u548c\u80a0\u905316s\u7f16\u53f7", "\u5c3e\u8102g", "\u5c3e\u8102/\u80f4\u4f53\u91cdg/kg", "\u5c3e\u8102/\u5bb0\u524d\u6d3b\u91cdg/kg")
   miss_cols <- setdiff(need_cols, colnames(df))
   if (length(miss_cols) > 0) {
-    stop("tailfat 文件缺少列：", paste(miss_cols, collapse = ", "))
+    stop("The tailfat file is missing columns: ", paste(miss_cols, collapse = ", "))
   }
   
   out <- df[, need_cols, drop = FALSE]
@@ -244,7 +244,7 @@ read_tailfat_traits <- function(fp) {
   out
 }
 
-# 3.9 对齐两个矩阵（行=样本）
+# 3.9 Align two matrices (rows = samples)
 align_two_blocks <- function(df1, df2) {
   s1 <- clean_sample_id(df1$SampleID)
   s2 <- clean_sample_id(df2$SampleID)
@@ -253,7 +253,7 @@ align_two_blocks <- function(df1, df2) {
   common_samples <- sort(common_samples)
   
   if (length(common_samples) == 0) {
-    stop("两个 block 没有共同样本。")
+    stop("The two blocks have no common samples.")
   }
   
   df1$SampleID <- s1
@@ -275,7 +275,7 @@ align_two_blocks <- function(df1, df2) {
   )
 }
 
-# 3.10 Spearman 两两相关
+# 3.10 Pairwise Spearman correlation
 run_pairwise_spearman <- function(df_x, df_y, module_name) {
   x_names <- colnames(df_x)
   y_names <- colnames(df_y)
@@ -327,7 +327,7 @@ run_pairwise_spearman <- function(df_x, df_y, module_name) {
   res
 }
 
-# 3.11 模块摘要
+# 3.11 Module summary
 make_module_summary <- function(res_df, q_cut = 0.05, rho_cut = 0.30) {
   sig <- res_df |>
     dplyr::filter(!is.na(q), !is.na(rho), q < q_cut, abs(rho) >= rho_cut)
@@ -346,10 +346,10 @@ make_module_summary <- function(res_df, q_cut = 0.05, rho_cut = 0.30) {
 }
 
 ############################
-## 4. 读取数据
+## 4. Read data
 ############################
 cat("======================================\n")
-cat("读取数据...\n")
+cat("Reading data...\n")
 cat("======================================\n")
 
 rum_raw_mat <- read_genus_table(rum_fp, sheet = 1)
@@ -361,10 +361,10 @@ liver_df_raw   <- read_liver_strict(liver_fp)
 tailfat_df_raw <- read_tailfat_traits(tail_fp)
 
 ############################
-## 5. 微生物 prevalence过滤 + CZM + CLR + z-score
+## 5. Microbiome prevalence filtering + CZM + CLR + z-score
 ############################
 cat("======================================\n")
-cat("微生物预处理：prevalence -> CZM -> CLR -> z-score\n")
+cat("Microbiome preprocessing: prevalence -> CZM -> CLR -> z-score\n")
 cat("======================================\n")
 
 rum_prev <- prevalence_filter(
@@ -403,10 +403,10 @@ ile_clr_z$SampleID <- clean_sample_id(ile_clr_z$SampleID)
 col_clr_z$SampleID <- clean_sample_id(col_clr_z$SampleID)
 
 ############################
-## 6. liver / blood / tailfat 做 z-score
+## 6. Apply z-score scaling to liver / blood / tailfat
 ############################
 cat("======================================\n")
-cat("宿主层数据 z-score...\n")
+cat("Applying z-score scaling to host-layer data...\n")
 cat("======================================\n")
 
 liver_df <- liver_df_raw
@@ -433,7 +433,7 @@ tailfat_df_z[, setdiff(colnames(tailfat_df_z), "SampleID")] <-
 ## 7. QC summary
 ############################
 cat("======================================\n")
-cat("生成 QC summary...\n")
+cat("Generating QC summary...\n")
 cat("======================================\n")
 
 all_sample_sets <- list(
@@ -484,10 +484,10 @@ all_block_common_summary <- data.frame(
 )
 
 ############################
-## 8. 11个模块对齐并分析
+## 8. Align and analyze 11 modules
 ############################
 cat("======================================\n")
-cat("开始 11 个模块 Spearman 相关分析...\n")
+cat("Starting Spearman correlation analysis for 11 modules...\n")
 cat("======================================\n")
 
 module_def <- list(
@@ -554,7 +554,7 @@ module_summary_df <- dplyr::bind_rows(module_summary_list)
 module_common_n_df <- dplyr::bind_rows(module_common_n)
 
 ############################
-## 9. 导出 feature 名单 / 预处理矩阵
+## 9. Export feature lists / preprocessed matrices
 ############################
 rum_feature_list <- data.frame(
   Block = "Rum",
@@ -598,10 +598,10 @@ feature_list_df <- dplyr::bind_rows(
 )
 
 ############################
-## 10. 保存 Excel 结果
+## 10. Save Excel results
 ############################
 cat("======================================\n")
-cat("写出 Excel 结果...\n")
+cat("Writing Excel results...\n")
 cat("======================================\n")
 
 wb <- openxlsx::createWorkbook()
@@ -619,14 +619,14 @@ openxlsx::writeData(wb, "All_block_common", all_block_common_summary)
 openxlsx::addWorksheet(wb, "Module_common_samples")
 openxlsx::writeData(wb, "Module_common_samples", module_common_n_df)
 
-## 10.2 feature 名单
+## 10.2 Feature lists
 openxlsx::addWorksheet(wb, "Feature_list")
 openxlsx::writeData(wb, "Feature_list", feature_list_df)
 
 openxlsx::addWorksheet(wb, "Liver_KEGG_gene_list")
 openxlsx::writeData(wb, "Liver_KEGG_gene_list", liver_feature_list)
 
-## 10.3 prevalence 信息
+## 10.3 Prevalence information
 openxlsx::addWorksheet(wb, "Rum_prevalence_info")
 openxlsx::writeData(wb, "Rum_prevalence_info", rum_prev$info)
 
@@ -636,7 +636,7 @@ openxlsx::writeData(wb, "Ile_prevalence_info", ile_prev$info)
 openxlsx::addWorksheet(wb, "Colon_prevalence_info")
 openxlsx::writeData(wb, "Colon_prevalence_info", col_prev$info)
 
-## 10.4 预处理矩阵
+## 10.4 Preprocessed matrices
 openxlsx::addWorksheet(wb, "Rum_CLR_z")
 openxlsx::writeData(wb, "Rum_CLR_z", rum_clr_z)
 
@@ -655,19 +655,19 @@ openxlsx::writeData(wb, "Blood_z", blood_df_z)
 openxlsx::addWorksheet(wb, "Tailfat_z")
 openxlsx::writeData(wb, "Tailfat_z", tailfat_df_z)
 
-## 10.5 模块摘要
+## 10.5 Module summaries
 openxlsx::addWorksheet(wb, "Module_summary")
 openxlsx::writeData(wb, "Module_summary", module_summary_df)
 
-## 10.6 全部相关结果
+## 10.6 All correlation results
 openxlsx::addWorksheet(wb, "All_associations")
 openxlsx::writeData(wb, "All_associations", all_results_df)
 
-## 10.7 显著结果
+## 10.7 Significant results
 openxlsx::addWorksheet(wb, "Significant_associations")
 openxlsx::writeData(wb, "Significant_associations", sig_results_df)
 
-## 10.8 各模块单独表
+## 10.8 Separate sheets for each module
 for (nm in names(all_results)) {
   sheet_nm <- paste0(substr(nm, 1, 28), "_all")
   sheet_nm <- gsub("[\\\\/:?*\\[\\]]", "_", sheet_nm)
@@ -682,7 +682,7 @@ for (nm in names(sig_results)) {
   openxlsx::writeData(wb, sheet_nm, sig_results[[nm]])
 }
 
-## 基础样式
+## Basic style
 header_style <- openxlsx::createStyle(
   textDecoration = "bold",
   halign = "center",
@@ -706,7 +706,7 @@ out_xlsx <- file.path(out_dir, "sGCCA_prelude_Spearman_11modules_results.xlsx")
 openxlsx::saveWorkbook(wb, out_xlsx, overwrite = TRUE)
 
 ############################
-## 11. 另存几个常用单文件
+## 11. Save several commonly used standalone files
 ############################
 openxlsx::write.xlsx(
   x = liver_feature_list,
@@ -727,18 +727,18 @@ openxlsx::write.xlsx(
 )
 
 ############################
-## 12. 控制台输出
+## 12. Console output
 ############################
 cat("\n======================================\n")
-cat("运行完成。\n")
-cat("结果目录：", out_dir, "\n")
-cat("总结果文件：", out_xlsx, "\n")
-cat("显著阈值：q <", q_cut, "且 |rho| >=", rho_cut, "\n")
-cat("Rum 保留 genus 数：", nrow(rum_prev$mat), "\n")
-cat("Ile 保留 genus 数：", nrow(ile_prev$mat), "\n")
-cat("Colon 保留 genus 数：", nrow(col_prev$mat), "\n")
-cat("Liver KEGG gene 数：", ncol(liver_df_z) - 1, "\n")
-cat("Blood trait 数：", ncol(blood_df_z) - 1, "\n")
-cat("Tailfat trait 数：", ncol(tailfat_df_z) - 1, "\n")
-cat("六个 block 共同样本数：", length(common_all_6), "\n")
+cat("Run completed.\n")
+cat("Result directory: ", out_dir, "\n")
+cat("Overall result file: ", out_xlsx, "\n")
+cat("Significance threshold: q <", q_cut, "and |rho| >=", rho_cut, "\n")
+cat("Number of retained Rum genera: ", nrow(rum_prev$mat), "\n")
+cat("Number of retained Ile genera: ", nrow(ile_prev$mat), "\n")
+cat("Number of retained Colon genera: ", nrow(col_prev$mat), "\n")
+cat("Number of liver KEGG genes: ", ncol(liver_df_z) - 1, "\n")
+cat("Number of blood traits: ", ncol(blood_df_z) - 1, "\n")
+cat("Number of tailfat traits: ", ncol(tailfat_df_z) - 1, "\n")
+cat("Number of common samples across the six blocks: ", length(common_all_6), "\n")
 cat("======================================\n")

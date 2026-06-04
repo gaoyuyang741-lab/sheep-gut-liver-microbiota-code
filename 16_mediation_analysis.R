@@ -1,5 +1,5 @@
 ############################
-## 0. 环境与包
+## 0. Environment and packages
 ############################
 rm(list = ls())
 gc()
@@ -33,7 +33,7 @@ options(stringsAsFactors = FALSE, scipen = 999)
 set.seed(123)
 
 ############################
-## 1. 路径区
+## 1. Paths
 ############################
 # Input and output directories
 # Please place the required input files in "data/mediation/input".
@@ -53,7 +53,7 @@ paths <- list(
 )
 
 ############################
-## 2. sheet区
+## 2. Sheet configuration
 ############################
 sheet_cfg <- list(
   col_sheet   = 1,
@@ -63,7 +63,7 @@ sheet_cfg <- list(
 )
 
 ############################
-## 3. 参数区
+## 3. Parameters
 ############################
 prevalence_cut <- 0.50
 min_nonzero_n  <- NULL
@@ -75,7 +75,7 @@ n_cores <- max(1, parallel::detectCores(logical = FALSE) - 1)
 chunk_size <- 5000
 
 ############################
-## 4. 文件名配置
+## 4. File-name configuration
 ############################
 checkpoint_files <- list(
   col_partial_csv = file.path(out_dir, "col_results_partial.csv"),
@@ -92,7 +92,7 @@ checkpoint_files <- list(
 )
 
 ############################
-## 5. 工具函数
+## 5. Helper functions
 ############################
 
 clean_id <- function(x) {
@@ -135,13 +135,13 @@ make_safe_names_with_map <- function(x, prefix = "V") {
   tibble::tibble(original = orig, safe = safe, prefix = prefix)
 }
 
-## 5.1 读 genus 丰度表：第一列为 Genus，后面为样本列
+## 5.1 Read the genus abundance table: the first column is Genus and the remaining columns are samples
 read_genus_table <- function(fp, sheet = 1) {
   df <- readxl::read_excel(fp, sheet = sheet)
   df <- as.data.frame(df, check.names = FALSE)
   
   if (!"Genus" %in% colnames(df)) {
-    stop("文件中未找到 'Genus' 列：", fp)
+    stop("The 'Genus' column was not found in the file: ", fp)
   }
   
   df <- df[!is.na(df$Genus) & df$Genus != "", , drop = FALSE]
@@ -155,7 +155,7 @@ read_genus_table <- function(fp, sheet = 1) {
   }
   df[is.na(df)] <- 0
   
-  ## 同名 genus 合并
+  ## Merge duplicated genus names
   df <- df %>%
     dplyr::group_by(Genus) %>%
     dplyr::summarise(dplyr::across(dplyr::everything(), ~sum(.x, na.rm = TRUE)), .groups = "drop")
@@ -167,7 +167,7 @@ read_genus_table <- function(fp, sheet = 1) {
   mat
 }
 
-## 5.2 prevalence 过滤（按 >0 的样本比例）
+## 5.2 Prevalence filtering based on the proportion of samples with abundance > 0
 prevalence_filter <- function(mat, prevalence_cut = 0.50, min_nonzero_n = NULL) {
   prev <- rowMeans(mat > 0, na.rm = TRUE)
   nonzero_n <- rowSums(mat > 0, na.rm = TRUE)
@@ -192,13 +192,13 @@ prevalence_filter <- function(mat, prevalence_cut = 0.50, min_nonzero_n = NULL) 
   )
 }
 
-## 5.3 CZM补零 + CLR（保持 sample x genus）
+## 5.3 CZM zero replacement and CLR transformation (sample x genus)
 clr_transform_czm <- function(mat_genus_by_sample) {
   if (nrow(mat_genus_by_sample) < 2) {
-    stop("过滤后特征数 < 2，无法做 CLR。请放宽 prevalence_cut。")
+    stop("The number of features after filtering is < 2; CLR transformation cannot be performed. Please relax prevalence_cut.")
   }
   
-  x <- t(mat_genus_by_sample)  ## 行=样本，列=genus
+  x <- t(mat_genus_by_sample)  ## rows = samples, columns = genera
   
   x_nozero <- zCompositions::cmultRepl(
     X = x,
@@ -213,10 +213,10 @@ clr_transform_czm <- function(mat_genus_by_sample) {
   x_clr
 }
 
-## 5.4 整理微生物 block
+## 5.4 Prepare the microbial block
 prep_microbe_block_pairwise_style <- function(filepath, sheet = 1, block_name = "Col",
                                               prevalence_cut = 0.50, min_nonzero_n = NULL) {
-  message("读取微生物数据：", block_name)
+  message("Reading microbial data: ", block_name)
   
   raw_mat <- read_genus_table(filepath, sheet = sheet)
   
@@ -226,7 +226,7 @@ prep_microbe_block_pairwise_style <- function(filepath, sheet = 1, block_name = 
     min_nonzero_n = min_nonzero_n
   )
   
-  message(block_name, " prevalence过滤后保留特征数：", nrow(prev_obj$mat))
+  message(block_name, " features retained after prevalence filtering: ", nrow(prev_obj$mat))
   
   clr_mat <- clr_transform_czm(prev_obj$mat)
   
@@ -253,13 +253,13 @@ prep_microbe_block_pairwise_style <- function(filepath, sheet = 1, block_name = 
 
 ## 5.5 liver expression
 prep_liver_expression <- function(filepath, sheet = "formal_log2TPM") {
-  message("读取肝脏基因表达矩阵...")
+  message("Reading the liver gene expression matrix...")
   
   raw_df <- readxl::read_excel(filepath, sheet = sheet, skip = 1)
   raw_df <- as.data.frame(raw_df, check.names = FALSE)
   
   if (!"Gene" %in% colnames(raw_df)) {
-    stop("肝脏表达表中未找到 'Gene' 列。")
+    stop("The 'Gene' column was not found in the liver expression table.")
   }
   
   raw_df <- raw_df[!is.na(raw_df$Gene) & raw_df$Gene != "", , drop = FALSE]
@@ -300,7 +300,7 @@ prep_liver_expression <- function(filepath, sheet = "formal_log2TPM") {
 
 ## 5.6 blood traits
 prep_blood_traits <- function(filepath, sheet = "selected_raw_table") {
-  message("读取血液表型（5项）...")
+  message("Reading blood phenotypes (5 traits)...")
   
   raw_df <- readxl::read_excel(filepath, sheet = sheet)
   raw_df <- as.data.frame(raw_df, check.names = FALSE)
@@ -308,7 +308,7 @@ prep_blood_traits <- function(filepath, sheet = "selected_raw_table") {
   need_cols <- c("Sample16S", "TC", "TG", "LDL", "TBA", "GLU")
   miss_cols <- setdiff(need_cols, colnames(raw_df))
   if (length(miss_cols) > 0) {
-    stop("blood表缺少列：", paste(miss_cols, collapse = ", "))
+    stop("The blood phenotype table is missing columns: ", paste(miss_cols, collapse = ", "))
   }
   
   out <- raw_df %>%
@@ -328,7 +328,7 @@ prep_blood_traits <- function(filepath, sheet = "selected_raw_table") {
 
 ## 5.7 tail traits
 prep_tail_traits <- function(filepath, sheet = "尾脂_16s编号") {
-  message("读取尾脂表型（3项）...")
+  message("Reading tail-fat phenotypes (3 traits)...")
   
   raw_df <- readxl::read_excel(filepath, sheet = sheet, skip = 4)
   raw_df <- as.data.frame(raw_df, check.names = FALSE)
@@ -336,7 +336,7 @@ prep_tail_traits <- function(filepath, sheet = "尾脂_16s编号") {
   need_cols <- c("瘤胃和肠道16s编号", "尾脂g", "尾脂/胴体重g/kg", "尾脂/宰前活重g/kg")
   miss_cols <- setdiff(need_cols, colnames(raw_df))
   if (length(miss_cols) > 0) {
-    stop("尾脂表缺少列：", paste(miss_cols, collapse = ", "))
+    stop("The tail-fat phenotype table is missing columns: ", paste(miss_cols, collapse = ", "))
   }
   
   out <- raw_df %>%
@@ -352,7 +352,7 @@ prep_tail_traits <- function(filepath, sheet = "尾脂_16s编号") {
   out
 }
 
-## 5.8 合并 traits 并 z-score
+## 5.8 Merge traits and apply z-score standardization
 prep_all_traits <- function(blood_df, tail_df) {
   trait_df <- dplyr::full_join(blood_df, tail_df, by = "SampleID")
   trait_z <- zscore_df(trait_df, id_col = "SampleID")
@@ -375,7 +375,7 @@ prep_all_traits <- function(blood_df, tail_df) {
   )
 }
 
-## 5.9 三块数据对齐
+## 5.9 Align the three data blocks
 align_three_blocks <- function(source_df, mediator_df, trait_df) {
   common_ids <- Reduce(intersect, list(
     source_df$SampleID,
@@ -386,7 +386,7 @@ align_three_blocks <- function(source_df, mediator_df, trait_df) {
   common_ids <- sort(unique(common_ids))
   
   if (length(common_ids) < 5) {
-    stop("三块数据共同样本过少（<5），请检查样本ID是否统一。")
+    stop("Too few shared samples across the three data blocks (<5). Please check whether sample IDs are consistent.")
   }
   
   source_aln <- source_df %>%
@@ -413,11 +413,11 @@ align_three_blocks <- function(source_df, mediator_df, trait_df) {
   )
 }
 
-## 5.10 构建全部候选链（不预筛）
+## 5.10 Build all candidate chains without pre-screening
 build_all_candidates <- function(source_df, mediator_df, trait_df,
                                  source_map, mediator_map, trait_map,
                                  source_block = "Col") {
-  message("开始构建全部候选链：", source_block)
+  message("Building all candidate chains for: ", source_block)
   
   source_names   <- setdiff(colnames(source_df), "SampleID")
   mediator_names <- setdiff(colnames(mediator_df), "SampleID")
@@ -633,14 +633,14 @@ run_mediation_candidates_resume <- function(aligned_source, aligned_mediator, al
   
   bad_idx_n <- sum(!is.finite(cand_df$source_idx) | !is.finite(cand_df$mediator_idx) | !is.finite(cand_df$trait_idx))
   if (bad_idx_n > 0) {
-    warning(source_block, " 有 ", bad_idx_n, " 条候选链在索引映射时失败，已自动剔除。")
+    warning(source_block, " candidate chains failed during index mapping and have been removed automatically: ", bad_idx_n)
     cand_df <- cand_df %>%
       dplyr::filter(is.finite(source_idx), is.finite(mediator_idx), is.finite(trait_idx))
   }
   
   existing_res <- NULL
   if (file.exists(partial_rds)) {
-    message(source_block, " 检测到已有 partial 结果，准备断点续跑：", partial_rds)
+    message(source_block, " existing partial results detected; resuming from checkpoint: ", partial_rds)
     existing_res <- readRDS(partial_rds)
     
     if (!"chain_id" %in% colnames(existing_res)) {
@@ -656,12 +656,12 @@ run_mediation_candidates_resume <- function(aligned_source, aligned_mediator, al
   cand_todo <- cand_df %>%
     dplyr::filter(!chain_id %in% done_ids)
   
-  message(source_block, " 候选链总数：", nrow(cand_df))
-  message(source_block, " 已完成链条数：", length(done_ids))
-  message(source_block, " 本次待跑链条数：", nrow(cand_todo))
+  message(source_block, " total candidate chains: ", nrow(cand_df))
+  message(source_block, " completed chains: ", length(done_ids))
+  message(source_block, " chains to run in this session: ", nrow(cand_todo))
   
   if (nrow(cand_todo) == 0) {
-    message(source_block, " 无需继续，全部链条已跑完。")
+    message(source_block, " no additional run is required; all chains have already been completed.")
     return(existing_res)
   }
   
@@ -676,7 +676,7 @@ run_mediation_candidates_resume <- function(aligned_source, aligned_mediator, al
   idx_groups <- split(seq_len(nrow(cand_todo)), ceiling(seq_len(nrow(cand_todo)) / chunk_size))
   merged_res <- existing_res
   
-  message(source_block, " 并行核数：", n_cores, "；每块链条数：", chunk_size, "；总块数：", length(idx_groups))
+  message(source_block, " parallel cores: ", n_cores, "; chains per chunk: ", chunk_size, "; total chunks: ", length(idx_groups))
   
   cl <- NULL
   if (.Platform$OS.type == "windows" && n_cores > 1) {
@@ -740,10 +740,10 @@ run_mediation_candidates_resume <- function(aligned_source, aligned_mediator, al
     
     dt_min <- as.numeric(difftime(Sys.time(), t0, units = "mins"))
     message(
-      source_block, " 已完成第 ", g, " / ", length(idx_groups), " 块；累计完成 ",
+      source_block, " completed chunk ", g, " / ", length(idx_groups), "; cumulative completed chains: ",
       length(unique(merged_res$chain_id)), " / ", nrow(cand_df),
-      "（本轮新跑 ", done_now, " / ", nrow(cand_todo), "）",
-      "；本块耗时 ", round(dt_min, 2), " 分钟"
+      " (newly completed in this session: ", done_now, " / ", nrow(cand_todo), ")",
+      "; elapsed time for this chunk: ", round(dt_min, 2), " min"
     )
     gc(verbose = FALSE)
   }
@@ -778,7 +778,7 @@ attach_original_names <- function(res_df, cand_df) {
     dplyr::relocate(source_block, source_feature, mediator_feature, trait_feature, .before = 1)
 }
 
-## 5.11 统一补齐关键列
+## 5.11 Harmonize and complete key columns
 standardize_result_columns <- function(df) {
   need_cols <- c(
     "chain_id",
@@ -812,7 +812,7 @@ standardize_result_columns <- function(df) {
   df
 }
 
-## 5.12 重新计算 final_sig
+## 5.12 Recalculate final_sig
 add_final_sig <- function(df) {
   if (nrow(df) == 0) {
     df$final_sig <- character(0)
@@ -834,7 +834,7 @@ add_final_sig <- function(df) {
 }
 
 ############################
-## 6. 读取并预处理数据
+## 6. Read and preprocess data
 ############################
 col_obj <- prep_microbe_block_pairwise_style(
   filepath = paths$col,
@@ -865,7 +865,7 @@ trait_obj <- prep_all_traits(
 )
 
 ############################
-## 7. 样本对齐
+## 7. Align samples
 ############################
 col_aln <- align_three_blocks(
   source_df   = col_obj$data,
@@ -874,7 +874,7 @@ col_aln <- align_three_blocks(
 )
 
 ############################
-## 8. 构建全部候选链（Col）
+## 8. Build all candidate chains for Col
 ############################
 col_cand <- build_all_candidates(
   source_df    = col_aln$source,
@@ -890,7 +890,7 @@ utils::write.csv(col_cand, file.path(out_dir, "col_all_candidates.csv"), row.nam
 saveRDS(col_cand, file.path(out_dir, "col_all_candidates.rds"))
 
 ############################
-## 9. 正式 mediation（Col，可断点续跑）
+## 9. Formal mediation analysis for Col with checkpoint-based resumption
 ############################
 col_res <- run_mediation_candidates_resume(
   aligned_source   = col_aln$source,
@@ -914,17 +914,17 @@ utils::write.csv(col_res, checkpoint_files$col_final_csv, row.names = FALSE, fil
 saveRDS(col_res, checkpoint_files$col_final_rds)
 
 ############################
-## 10. 回填原始名称
+## 10. Restore original feature names
 ############################
 col_res2 <- attach_original_names(col_res, col_cand)
 col_res2 <- add_final_sig(col_res2)
 col_res2 <- standardize_result_columns(col_res2)
 
 ############################
-## 11. 读取旧 combined（Rum + Ile）
+## 11. Read the previous combined results (Rum + Ile)
 ############################
 if (!file.exists(paths$old_combined)) {
-  stop("未找到旧 combined 文件：", paths$old_combined)
+  stop("The previous combined file was not found: ", paths$old_combined)
 }
 
 old_combined <- utils::read.csv(paths$old_combined, check.names = FALSE, stringsAsFactors = FALSE)
@@ -932,7 +932,7 @@ old_combined <- standardize_result_columns(old_combined)
 old_combined <- add_final_sig(old_combined)
 
 ############################
-## 12. 合并旧结果 + Col 结果
+## 12. Merge previous results and Col results
 ############################
 combined_res <- dplyr::bind_rows(old_combined, col_res2)
 
@@ -945,7 +945,7 @@ utils::write.csv(combined_res, checkpoint_files$combined_csv, row.names = FALSE,
 saveRDS(combined_res, checkpoint_files$combined_rds)
 
 ############################
-## 13. 汇总信息表
+## 13. Summary information table
 ############################
 summary_info <- tibble::tibble(
   item = c(
@@ -989,35 +989,35 @@ summary_info <- tibble::tibble(
 saveRDS(summary_info, checkpoint_files$summary_rds)
 
 ############################
-## 14. 输出 Excel
+## 14. Export Excel file
 ############################
 wb <- openxlsx::createWorkbook()
 
 openxlsx::addWorksheet(wb, "README")
 readme_text <- data.frame(
   Section = c(
-    "分析框架",
-    "微生物预处理",
-    "肝脏基因处理",
-    "表型处理",
-    "候选链进入规则",
-    "正式 mediation",
-    "并行加速",
-    "最终显著链标准",
-    "断点续跑说明",
-    "结果整合说明"
+    "Analysis framework",
+    "Microbial preprocessing",
+    "Liver gene processing",
+    "Phenotype processing",
+    "Candidate-chain inclusion rule",
+    "Formal mediation analysis",
+    "Parallel acceleration",
+    "Final significance criteria",
+    "Checkpoint-resumption note",
+    "Result integration note"
   ),
   Detail = c(
-    "本次新增 Col->liver gene->8 traits；跑完后与既有 Rum+Ile combined 结果合并",
-    paste0("与原脚本完全一致：prevalence过滤(比例阈值 ", prevalence_cut, ") -> CZM补零 -> CLR -> z-score"),
+    "This script adds Col -> liver gene -> 8 traits and merges the completed results with the existing Rum + Ile combined results",
+    paste0("Consistent with the original script: prevalence filtering (proportion threshold ", prevalence_cut, ") -> CZM zero replacement -> CLR -> z-score"),
     "formal_log2TPM -> z-score",
-    "血液5项 + 尾脂3项合并后 -> z-score",
-    "不进行预筛；全部 source × mediator × trait 组合直接进入正式 mediation",
+    "Five blood traits and three tail-fat traits are merged and then z-score standardized",
+    "No pre-screening is applied; all source x mediator x trait combinations enter the formal mediation analysis",
     paste0("mediate(boot=TRUE, sims=", boot_sims, ")"),
-    paste0("按块并行；n_cores=", n_cores, "；chunk_size=", chunk_size),
+    paste0("Chunk-wise parallelization; n_cores=", n_cores, "; chunk_size=", chunk_size),
     "a_p<0.05, b_p<0.05, acme_p<0.05, 0<prop_med<1, prop_med_p<0.05",
-    paste0("每 ", save_every_n, " 条链自动保存 partial；下次重跑可自动续跑"),
-    "最终总表 = 旧 Rum+Ile combined_mediation_results.csv + 新 Col 结果"
+    paste0("Partial results are saved automatically every ", save_every_n, " chains; rerunning the script will resume from the checkpoint"),
+    "Final combined table = previous Rum + Ile combined_mediation_results.csv + new Col results"
   ),
   stringsAsFactors = FALSE
 )
@@ -1076,22 +1076,22 @@ for (sh in openxlsx::sheets(wb)) {
 openxlsx::saveWorkbook(wb, checkpoint_files$excel_out, overwrite = TRUE)
 
 ############################
-## 15. 控制台提示
+## 15. Console messages
 ############################
 cat("\n=============================\n")
-cat("结肠中介分析完成（沿用原逻辑，新增 Col）\n")
+cat("Colon mediation analysis completed using the original logic with the added Col block.\n")
 cat("=============================\n")
-cat("结果目录：", out_dir, "\n")
-cat("Excel总表：", checkpoint_files$excel_out, "\n\n")
+cat("Result directory: ", out_dir, "\n")
+cat("Excel summary file: ", checkpoint_files$excel_out, "\n\n")
 
-cat("关键统计：\n")
-cat("并行核数：", n_cores, "\n")
-cat("每块链条数：", chunk_size, "\n")
-cat("Col prevalence过滤后特征数：", col_obj$n_feature_after, "\n")
-cat("Liver 基因数：", liver_obj$n_gene_after, "\n")
-cat("Col 全部候选链数：", nrow(col_cand), "\n")
-cat("Col 正式结果条数：", nrow(col_res2), "\n")
-cat("旧 combined 总条数：", nrow(old_combined), "\n")
-cat("新 combined 总条数：", nrow(combined_res), "\n")
-cat("新 combined 最终显著链条数：", sum(combined_res$final_sig == "yes", na.rm = TRUE), "\n")
+cat("Key statistics:\n")
+cat("Parallel cores: ", n_cores, "\n")
+cat("Chains per chunk: ", chunk_size, "\n")
+cat("Col features after prevalence filtering: ", col_obj$n_feature_after, "\n")
+cat("Number of liver genes: ", liver_obj$n_gene_after, "\n")
+cat("Total Col candidate chains: ", nrow(col_cand), "\n")
+cat("Col formal result rows: ", nrow(col_res2), "\n")
+cat("Previous combined result rows: ", nrow(old_combined), "\n")
+cat("New combined result rows: ", nrow(combined_res), "\n")
+cat("Final significant chains in the new combined results: ", sum(combined_res$final_sig == "yes", na.rm = TRUE), "\n")
 cat("\n")

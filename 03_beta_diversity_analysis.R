@@ -5,7 +5,7 @@ options(stringsAsFactors = FALSE)
 gc()
 
 # -------------------------------
-# 0. 加载程序包
+# 0. Load packages
 # -------------------------------
 pkg_needed <- c(
   "readxl", "openxlsx", "dplyr", "stringr", "vegan",
@@ -18,7 +18,7 @@ if (length(pkg_to_install) > 0) {
 invisible(lapply(pkg_needed, library, character.only = TRUE))
 
 # -------------------------------
-# 1. 路径设置
+# 1. Path settings
 # -------------------------------
 # 1. Path settings
 # Please place the required beta-diversity input files in "data/diversity/beta/input".
@@ -33,54 +33,54 @@ abund_file <- file.path(in_dir, "all_abundance.xlsx")
 meta_file  <- file.path(in_dir, "metadata.xlsx")
 
 # -------------------------------
-# 2. 输出文件夹设置
+# 2. Output-folder settings
 # -------------------------------
-dir.create(file.path(out_dir, "01_整理后的输入表"), showWarnings = FALSE, recursive = TRUE)
-dir.create(file.path(out_dir, "02_距离矩阵"), showWarnings = FALSE, recursive = TRUE)
-dir.create(file.path(out_dir, "03_PCoA坐标"), showWarnings = FALSE, recursive = TRUE)
-dir.create(file.path(out_dir, "04_统计结果"), showWarnings = FALSE, recursive = TRUE)
-dir.create(file.path(out_dir, "05_图形"), showWarnings = FALSE, recursive = TRUE)
+dir.create(file.path(out_dir, "01_preprocessed_input_tables"), showWarnings = FALSE, recursive = TRUE)
+dir.create(file.path(out_dir, "02_distance_matrices"), showWarnings = FALSE, recursive = TRUE)
+dir.create(file.path(out_dir, "03_PCoA_coordinates"), showWarnings = FALSE, recursive = TRUE)
+dir.create(file.path(out_dir, "04_statistical_results"), showWarnings = FALSE, recursive = TRUE)
+dir.create(file.path(out_dir, "05_figures"), showWarnings = FALSE, recursive = TRUE)
 
 # -------------------------------
-# 3. 读取总丰度表
+# 3. Read total abundance table
 # -------------------------------
 abund_raw <- read.xlsx(abund_file)
 
 tax_cols <- c("Phylum", "Class", "Order", "Family", "Genus", "Species")
 miss_tax <- setdiff(tax_cols, colnames(abund_raw))
 if (length(miss_tax) > 0) {
-  stop("总丰度表缺少以下分类列：", paste(miss_tax, collapse = ", "))
+  stop("The total abundance table is missing the following taxonomy columns: ", paste(miss_tax, collapse = ", "))
 }
 
 sample_cols <- setdiff(colnames(abund_raw), tax_cols)
 if (length(sample_cols) == 0) {
-  stop("总丰度表中没有检测到样本列。")
+  stop("No sample columns were detected in the total abundance table.")
 }
 
-# 分类列清理
+# Clean taxonomy columns
 for (cc in tax_cols) {
   abund_raw[[cc]] <- trimws(as.character(abund_raw[[cc]]))
   abund_raw[[cc]][is.na(abund_raw[[cc]])] <- ""
 }
 
-# 样本列转数值
+# Convert sample columns to numeric values
 for (cc in sample_cols) {
   abund_raw[[cc]] <- suppressWarnings(as.numeric(abund_raw[[cc]]))
   abund_raw[[cc]][is.na(abund_raw[[cc]])] <- 0
 }
 
-# 构建特征键
+# Construct feature keys
 abund_raw$FeatureID <- apply(abund_raw[, tax_cols, drop = FALSE], 1, function(x) {
   paste(x, collapse = "|||")
 })
 
-# 检查 FeatureID 是否重复
+# Check whether FeatureID values are duplicated
 dup_feature <- abund_raw %>%
   dplyr::count(FeatureID, name = "n") %>%
   dplyr::filter(n > 1)
 
 if (nrow(dup_feature) > 0) {
-  message("检测到重复 FeatureID，已自动按 FeatureID 合并并对样本列求和。")
+  message("Duplicated FeatureID values were detected; rows were merged by FeatureID and sample columns were summed automatically.")
   
   abund_raw <- abund_raw %>%
     dplyr::group_by(FeatureID, across(all_of(tax_cols))) %>%
@@ -88,14 +88,14 @@ if (nrow(dup_feature) > 0) {
 }
 
 # -------------------------------
-# 4. 读取 metadata
+# 4. Read metadata
 # -------------------------------
 meta <- read.xlsx(meta_file)
 
 need_meta_cols <- c("SampleID", "Group", "SheepID")
 miss_meta <- setdiff(need_meta_cols, colnames(meta))
 if (length(miss_meta) > 0) {
-  stop("metadata 缺少以下列：", paste(miss_meta, collapse = ", "))
+  stop("metadata is missing the following columns: ", paste(miss_meta, collapse = ", "))
 }
 
 meta <- meta %>%
@@ -106,20 +106,20 @@ meta <- meta %>%
     SheepID  = trimws(as.character(SheepID))
   )
 
-# 把 Group 重命名为 Site
+# Rename Group as Site
 meta <- meta %>%
   dplyr::rename(Site = Group)
 
-# Site 顺序固定
+# Fix Site order
 meta$Site <- factor(meta$Site, levels = c("Rum", "Ile", "Col"))
 
-# 从 SampleID 中提取真正处理组
-# 例如 R-BA1-1 / I-CM-3 / C-CON-6 -> BA1 / CM / CON
+# Extract the actual treatment group from SampleID
+# Example: R-BA1-1 / I-CM-3 / C-CON-6 -> BA1 / CM / CON
 meta$Treat <- stringr::str_split_fixed(meta$SampleID, "-", 3)[, 2]
 meta$Treat <- factor(meta$Treat, levels = c("BA1", "BA2", "CM", "CMPS", "CON"))
 
 # -------------------------------
-# 5. 核对样本一致性并重排
+# 5. Check sample consistency and reorder
 # -------------------------------
 sample_in_abund <- sample_cols
 sample_in_meta  <- meta$SampleID
@@ -128,55 +128,55 @@ miss_in_meta  <- setdiff(sample_in_abund, sample_in_meta)
 miss_in_abund <- setdiff(sample_in_meta, sample_in_abund)
 
 if (length(miss_in_meta) > 0) {
-  stop("总丰度表中以下样本在 metadata 中不存在：\n", paste(miss_in_meta, collapse = ", "))
+  stop("The following samples in the total abundance table are absent from metadata:\n", paste(miss_in_meta, collapse = ", "))
 }
 if (length(miss_in_abund) > 0) {
-  stop("metadata 中以下样本在总丰度表中不存在：\n", paste(miss_in_abund, collapse = ", "))
+  stop("The following samples in metadata are absent from the total abundance table:\n", paste(miss_in_abund, collapse = ", "))
 }
 
-# 按 metadata 顺序重排丰度表样本列
+# Reorder abundance-table sample columns according to metadata
 abund <- abund_raw[, c(tax_cols, "FeatureID", meta$SampleID), drop = FALSE]
 
-# 转为 样本 × 特征 矩阵
+# Convert to a sample-by-feature matrix
 otu_mat <- t(as.matrix(abund[, meta$SampleID, drop = FALSE]))
 colnames(otu_mat) <- abund$FeatureID
 rownames(otu_mat) <- meta$SampleID
 
-# 检查是否为非负数
+# Check for non-negative values
 if (any(otu_mat < 0, na.rm = TRUE)) {
-  stop("丰度矩阵中存在负值，请检查输入表。")
+  stop("Negative values are present in the abundance matrix; please check the input table.")
 }
 
-# 去掉全 0 特征
+# Remove all-zero features
 feat_sum <- colSums(otu_mat, na.rm = TRUE)
 otu_mat <- otu_mat[, feat_sum > 0, drop = FALSE]
 
-# 去掉全 0 样本
+# Remove all-zero samples
 sample_sum <- rowSums(otu_mat, na.rm = TRUE)
 if (any(sample_sum == 0)) {
   zero_samples <- names(sample_sum)[sample_sum == 0]
-  stop("以下样本总丰度为 0，无法进行 β 多样性分析：\n", paste(zero_samples, collapse = ", "))
+  stop("The following samples have total abundance of 0, so beta-diversity analysis cannot be performed:\n", paste(zero_samples, collapse = ", "))
 }
 
-# 导出整理后的输入表
+# Export preprocessed input tables
 input_abund_export <- data.frame(
   SampleID = rownames(otu_mat),
   otu_mat,
   check.names = FALSE
 )
 write.xlsx(input_abund_export,
-           file.path(out_dir, "01_整理后的输入表", "01_样本x特征丰度矩阵.xlsx"),
+           file.path(out_dir, "01_preprocessed_input_tables", "01_sample_by_feature_abundance_matrix.xlsx"),
            rowNames = FALSE)
 
 write.xlsx(meta,
-           file.path(out_dir, "01_整理后的输入表", "02_整理后的metadata.xlsx"),
+           file.path(out_dir, "01_preprocessed_input_tables", "02_preprocessed_metadata.xlsx"),
            rowNames = FALSE)
 
 # -------------------------------
-# 6. 定义函数
+# 6. Define functions
 # -------------------------------
 
-# 6.1 计算 PCoA 坐标
+# 6.1 Calculate PCoA coordinates
 get_pcoa_df <- function(dist_obj, meta_df) {
   pcoa_res <- ape::pcoa(dist_obj)
   
@@ -192,7 +192,7 @@ get_pcoa_df <- function(dist_obj, meta_df) {
   return(list(coord = coord, var_exp = var_exp, pcoa_res = pcoa_res))
 }
 
-# 6.2 画 PCoA 图
+# 6.2 Draw PCoA plots
 plot_pcoa <- function(coord_df, var_exp, title_text, out_pdf, out_png) {
   p <- ggplot(coord_df, aes(x = PCoA1, y = PCoA2, color = Site, fill = Site)) +
     stat_ellipse(geom = "polygon", alpha = 0.18, level = 0.95, linewidth = 0.4) +
@@ -217,13 +217,13 @@ plot_pcoa <- function(coord_df, var_exp, title_text, out_pdf, out_png) {
 
 # 6.3 PERMANOVA
 run_permanova <- function(dist_obj, meta_df) {
-  # 主模型：部位效应
+  # Main model: site effect
   adonis_site <- vegan::adonis2(dist_obj ~ Site, data = meta_df, permutations = 9999)
   
-  # 控制处理组后的部位效应
+  # Site effect after controlling for treatment group
   adonis_site_treat <- vegan::adonis2(dist_obj ~ Treat + Site, data = meta_df, permutations = 9999)
   
-  # 受限置换：按 SheepID 分层
+  # Restricted permutations stratified by SheepID
   adonis_site_strata <- vegan::adonis2(
     dist_obj ~ Site,
     data = meta_df,
@@ -244,7 +244,7 @@ run_permdisp <- function(dist_obj, meta_df) {
   bd_perm <- vegan::permutest(bd, permutations = 9999)
   bd_anova <- anova(bd)
   
-  # 各样本到组中心距离
+  # Distances from samples to group centroids
   dist_to_centroid <- data.frame(
     SampleID = names(bd$distances),
     DistanceToCentroid = as.numeric(bd$distances),
@@ -252,7 +252,7 @@ run_permdisp <- function(dist_obj, meta_df) {
   ) %>%
     dplyr::left_join(meta_df, by = "SampleID")
   
-  # 组均值
+  # Group means
   centroid_group_mean <- dist_to_centroid %>%
     dplyr::group_by(Site) %>%
     dplyr::summarise(
@@ -271,7 +271,7 @@ run_permdisp <- function(dist_obj, meta_df) {
   ))
 }
 
-# 6.5 两两比较
+# 6.5 Pairwise comparisons
 run_pairwise_adonis <- function(dist_obj, meta_df) {
   pairs <- list(
     c("Rum", "Ile"),
@@ -319,7 +319,7 @@ run_pairwise_adonis <- function(dist_obj, meta_df) {
   ))
 }
 
-# 6.6 保存距离矩阵
+# 6.6 Save distance matrices
 save_dist_matrix <- function(dist_obj, fp) {
   dm <- as.matrix(dist_obj)
   write.table(
@@ -332,7 +332,7 @@ save_dist_matrix <- function(dist_obj, fp) {
 }
 
 # -------------------------------
-# 7. 计算两种距离
+# 7. Calculate two distance metrics
 # -------------------------------
 
 # bray_curtis
@@ -343,26 +343,26 @@ otu_bin <- otu_mat
 otu_bin[otu_bin > 0] <- 1
 dist_jaccard <- vegan::vegdist(otu_bin, method = "jaccard", binary = TRUE)
 
-# 保存距离矩阵
+# Save distance matrices
 save_dist_matrix(dist_bray,
-                 file.path(out_dir, "02_距离矩阵", "allsample.bray_curtis_dm.txt"))
+                 file.path(out_dir, "02_distance_matrices", "allsample.bray_curtis_dm.txt"))
 save_dist_matrix(dist_jaccard,
-                 file.path(out_dir, "02_距离矩阵", "allsample.binary_jaccard_dm.txt"))
+                 file.path(out_dir, "02_distance_matrices", "allsample.binary_jaccard_dm.txt"))
 
 # -------------------------------
-# 8. Bray-Curtis 分析
+# 8. Bray-Curtis analysis
 # -------------------------------
 bray_pcoa <- get_pcoa_df(dist_bray, meta)
 write.xlsx(bray_pcoa$coord,
-           file.path(out_dir, "03_PCoA坐标", "bray_curtis_PCoA坐标.xlsx"),
+           file.path(out_dir, "03_PCoA_coordinates", "bray_curtis_PCoA_coordinates.xlsx"),
            rowNames = FALSE)
 
 plot_pcoa(
   coord_df = bray_pcoa$coord,
   var_exp = bray_pcoa$var_exp,
   title_text = "Bray-Curtis",
-  out_pdf = file.path(out_dir, "05_图形", "PCoA_BrayCurtis_3site.pdf"),
-  out_png = file.path(out_dir, "05_图形", "PCoA_BrayCurtis_3site.png")
+  out_pdf = file.path(out_dir, "05_figures", "PCoA_BrayCurtis_3site.pdf"),
+  out_png = file.path(out_dir, "05_figures", "PCoA_BrayCurtis_3site.png")
 )
 
 bray_permanova <- run_permanova(dist_bray, meta)
@@ -386,11 +386,11 @@ writeData(wb_bray, "4_PERMDISP_ANOVA", bray_permdisp$bd_anova_tab, rowNames = TR
 addWorksheet(wb_bray, "5_PERMDISP_permutest")
 writeData(wb_bray, "5_PERMDISP_permutest", bray_permdisp$bd_perm_tab, rowNames = TRUE)
 
-addWorksheet(wb_bray, "6_到组中心距离")
-writeData(wb_bray, "6_到组中心距离", bray_permdisp$dist_to_centroid, rowNames = FALSE)
+addWorksheet(wb_bray, "6_distance_to_centroid")
+writeData(wb_bray, "6_distance_to_centroid", bray_permdisp$dist_to_centroid, rowNames = FALSE)
 
-addWorksheet(wb_bray, "7_组中心距离均值")
-writeData(wb_bray, "7_组中心距离均值", bray_permdisp$centroid_group_mean, rowNames = FALSE)
+addWorksheet(wb_bray, "7_group_centroid_distance_mean")
+writeData(wb_bray, "7_group_centroid_distance_mean", bray_permdisp$centroid_group_mean, rowNames = FALSE)
 
 addWorksheet(wb_bray, "8_pairwise_PERMANOVA")
 writeData(wb_bray, "8_pairwise_PERMANOVA", bray_pairwise$pairwise_adonis, rowNames = TRUE)
@@ -399,23 +399,23 @@ addWorksheet(wb_bray, "9_pairwise_PERMDISP")
 writeData(wb_bray, "9_pairwise_PERMDISP", bray_pairwise$pairwise_disp, rowNames = TRUE)
 
 saveWorkbook(wb_bray,
-             file.path(out_dir, "04_统计结果", "bray_curtis_统计结果.xlsx"),
+             file.path(out_dir, "04_statistical_results", "bray_curtis_statistical_results.xlsx"),
              overwrite = TRUE)
 
 # -------------------------------
-# 9. Binary Jaccard 分析
+# 9. Binary Jaccard analysis
 # -------------------------------
 jaccard_pcoa <- get_pcoa_df(dist_jaccard, meta)
 write.xlsx(jaccard_pcoa$coord,
-           file.path(out_dir, "03_PCoA坐标", "binary_jaccard_PCoA坐标.xlsx"),
+           file.path(out_dir, "03_PCoA_coordinates", "binary_jaccard_PCoA_coordinates.xlsx"),
            rowNames = FALSE)
 
 plot_pcoa(
   coord_df = jaccard_pcoa$coord,
   var_exp = jaccard_pcoa$var_exp,
   title_text = "Binary Jaccard",
-  out_pdf = file.path(out_dir, "05_图形", "PCoA_BinaryJaccard_3site.pdf"),
-  out_png = file.path(out_dir, "05_图形", "PCoA_BinaryJaccard_3site.png")
+  out_pdf = file.path(out_dir, "05_figures", "PCoA_BinaryJaccard_3site.pdf"),
+  out_png = file.path(out_dir, "05_figures", "PCoA_BinaryJaccard_3site.png")
 )
 
 jaccard_permanova <- run_permanova(dist_jaccard, meta)
@@ -439,11 +439,11 @@ writeData(wb_jaccard, "4_PERMDISP_ANOVA", jaccard_permdisp$bd_anova_tab, rowName
 addWorksheet(wb_jaccard, "5_PERMDISP_permutest")
 writeData(wb_jaccard, "5_PERMDISP_permutest", jaccard_permdisp$bd_perm_tab, rowNames = TRUE)
 
-addWorksheet(wb_jaccard, "6_到组中心距离")
-writeData(wb_jaccard, "6_到组中心距离", jaccard_permdisp$dist_to_centroid, rowNames = FALSE)
+addWorksheet(wb_jaccard, "6_distance_to_centroid")
+writeData(wb_jaccard, "6_distance_to_centroid", jaccard_permdisp$dist_to_centroid, rowNames = FALSE)
 
-addWorksheet(wb_jaccard, "7_组中心距离均值")
-writeData(wb_jaccard, "7_组中心距离均值", jaccard_permdisp$centroid_group_mean, rowNames = FALSE)
+addWorksheet(wb_jaccard, "7_group_centroid_distance_mean")
+writeData(wb_jaccard, "7_group_centroid_distance_mean", jaccard_permdisp$centroid_group_mean, rowNames = FALSE)
 
 addWorksheet(wb_jaccard, "8_pairwise_PERMANOVA")
 writeData(wb_jaccard, "8_pairwise_PERMANOVA", jaccard_pairwise$pairwise_adonis, rowNames = TRUE)
@@ -452,52 +452,52 @@ addWorksheet(wb_jaccard, "9_pairwise_PERMDISP")
 writeData(wb_jaccard, "9_pairwise_PERMDISP", jaccard_pairwise$pairwise_disp, rowNames = TRUE)
 
 saveWorkbook(wb_jaccard,
-             file.path(out_dir, "04_统计结果", "binary_jaccard_统计结果.xlsx"),
+             file.path(out_dir, "04_statistical_results", "binary_jaccard_statistical_results.xlsx"),
              overwrite = TRUE)
 
 # -------------------------------
-# 10. 总体质控输出
+# 10. Overall quality-control output
 # -------------------------------
 qc_summary <- data.frame(
-  指标 = c(
-    "总样本数",
-    "Rum样本数",
-    "Ile样本数",
-    "Col样本数",
-    "总特征数（去除全0特征后）",
-    "是否存在 metadata 与丰度表样本不一致",
-    "是否使用系统发育树",
-    "是否计算 UniFrac"
+  Metric = c(
+    "Total sample count",
+    "Rum sample count",
+    "Ile sample count",
+    "Col sample count",
+    "Total feature count after removing all-zero features",
+    "Whether metadata and abundance-table samples are inconsistent",
+    "Whether a phylogenetic tree was used",
+    "Whether UniFrac was calculated"
   ),
-  数值 = c(
+  Value = c(
     nrow(meta),
     sum(meta$Site == "Rum"),
     sum(meta$Site == "Ile"),
     sum(meta$Site == "Col"),
     ncol(otu_mat),
-    "否",
-    "否",
-    "否"
+    "No",
+    "No",
+    "No"
   ),
   check.names = FALSE,
   stringsAsFactors = FALSE
 )
 
 write.xlsx(qc_summary,
-           file.path(out_dir, "04_统计结果", "0_分析质控汇总.xlsx"),
+           file.path(out_dir, "04_statistical_results", "0_analysis_qc_summary.xlsx"),
            rowNames = FALSE)
 
 # -------------------------------
-# 11. 控制台提示
+# 11. Console messages
 # -------------------------------
-cat("三部位 β 多样性分析已完成。\n")
-cat("输出目录：", out_dir, "\n")
-cat("主要结果包括：\n")
-cat("1. 02_距离矩阵/allsample.bray_curtis_dm.txt\n")
-cat("2. 02_距离矩阵/allsample.binary_jaccard_dm.txt\n")
-cat("3. 03_PCoA坐标/bray_curtis_PCoA坐标.xlsx\n")
-cat("4. 03_PCoA坐标/binary_jaccard_PCoA坐标.xlsx\n")
-cat("5. 04_统计结果/bray_curtis_统计结果.xlsx\n")
-cat("6. 04_统计结果/binary_jaccard_统计结果.xlsx\n")
-cat("7. 05_图形/PCoA_BrayCurtis_3site.pdf\n")
-cat("8. 05_图形/PCoA_BinaryJaccard_3site.pdf\n")
+cat("Three-site beta-diversity analysis has been completed.\n")
+cat("Output directory: ", out_dir, "\n")
+cat("Main outputs include:\n")
+cat("1. 02_distance_matrices/allsample.bray_curtis_dm.txt\n")
+cat("2. 02_distance_matrices/allsample.binary_jaccard_dm.txt\n")
+cat("3. 03_PCoA_coordinates/bray_curtis_PCoA_coordinates.xlsx\n")
+cat("4. 03_PCoA_coordinates/binary_jaccard_PCoA_coordinates.xlsx\n")
+cat("5. 04_statistical_results/bray_curtis_statistical_results.xlsx\n")
+cat("6. 04_statistical_results/binary_jaccard_statistical_results.xlsx\n")
+cat("7. 05_figures/PCoA_BrayCurtis_3site.pdf\n")
+cat("8. 05_figures/PCoA_BinaryJaccard_3site.pdf\n")

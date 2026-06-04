@@ -5,7 +5,7 @@ rm(list = ls())
 options(stringsAsFactors = FALSE)
 
 ## =========================
-## 0. 环境准备
+## 0. Environment setup
 ## =========================
 my_tmp <- "D:/R_tmp"
 dir.create(my_tmp, showWarnings = FALSE, recursive = TRUE)
@@ -37,7 +37,7 @@ library(tibble)
 library(grid)
 
 ## =========================
-## 1. 路径设置
+## 1. Path settings
 ## =========================
 # Input and output directories
 # This script reads coordinated-genera result files from "results/coordinated_genera".
@@ -46,7 +46,7 @@ library(grid)
 
 res_fp <- file.path(
   "results", "coordinated_genera",
-  "02_连续性结构分析_结果文件.xlsx"
+  "02_continuity_structure_analysis_result_file.xlsx"
 )
 
 genus_fp <- file.path(
@@ -63,12 +63,12 @@ out_dir <- file.path("figures", "coordinated_genera")
 
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
-if (!file.exists(res_fp))   stop("结果文件不存在：", res_fp)
-if (!file.exists(genus_fp)) stop("genus 丰度表不存在：", genus_fp)
-if (!file.exists(meta_fp))  stop("metadata 文件不存在：", meta_fp)
+if (!file.exists(res_fp))   stop("Result file does not exist: ", res_fp)
+if (!file.exists(genus_fp)) stop("Genus abundance table does not exist: ", genus_fp)
+if (!file.exists(meta_fp))  stop("Metadata file does not exist: ", meta_fp)
 
 ## =========================
-## 2. 配色（温和）
+## 2. Color palette (soft)
 ## =========================
 col_tcg_fill <- "#D9CCE8"
 col_tcg_line <- "#A68DBE"
@@ -107,7 +107,7 @@ col_grid   <- "#ECECEC"
 col_na     <- "#F5F5F5"
 
 ## =========================
-## 3. 通用函数
+## 3. General functions
 ## =========================
 theme_sci_soft <- function(base_size = 12) {
   theme_bw(base_size = base_size, base_family = "sans") +
@@ -155,36 +155,36 @@ sig_lab <- function(p_used) {
 }
 
 ## =========================
-## 4. 读取结果表
+## 4. Read result tables
 ## =========================
 pattern_df <- openxlsx::read.xlsx(res_fp, sheet = "Pattern_table")
 
 if (!"Genus" %in% colnames(pattern_df)) {
-  stop("Pattern_table 中缺少 Genus 列")
+  stop("Pattern_table is missing the Genus column")
 }
 if (!"structure_grade" %in% colnames(pattern_df)) {
-  stop("Pattern_table 中缺少 structure_grade 列")
+  stop("Pattern_table is missing the structure_grade column")
 }
 
 need_cols <- c("r_RI", "q_RI", "r_RC", "q_RC", "r_IC", "q_IC")
 miss_need_cols <- setdiff(need_cols, colnames(pattern_df))
 if (length(miss_need_cols) > 0) {
-  stop("Pattern_table 缺少必要列：", paste(miss_need_cols, collapse = ", "))
+  stop("Pattern_table is missing required columns: ", paste(miss_need_cols, collapse = ", "))
 }
 
 pattern_df <- pattern_df %>%
   dplyr::mutate(
     Class = dplyr::case_when(
-      structure_grade %in% c("三部位贯通强证据", "三部位贯通支持证据") ~ "TCG",
-      structure_grade == "前段连续强证据" ~ "FCG",
-      structure_grade == "前后呼应强证据" ~ "ELG",
-      structure_grade == "后段连续强证据" ~ "HCG",
+      structure_grade %in% c("three-compartment continuity: strong evidence", "three-compartment continuity: supporting evidence") ~ "TCG",
+      structure_grade == "anterior continuity: strong evidence" ~ "FCG",
+      structure_grade == "foregut-hindgut coupling: strong evidence" ~ "ELG",
+      structure_grade == "posterior continuity: strong evidence" ~ "HCG",
       TRUE ~ NA_character_
     )
   )
 
 ## =========================
-## 5. 读取 genus 丰度表与 metadata，计算 CLR
+## 5. Read genus abundance table and metadata, then calculate CLR
 ## =========================
 abund <- readxl::read_excel(genus_fp, sheet = 1)
 meta  <- readxl::read_excel(meta_fp, sheet = 1)
@@ -192,10 +192,10 @@ meta  <- readxl::read_excel(meta_fp, sheet = 1)
 req_meta_cols <- c("SampleID", "Group", "SheepID")
 miss_meta_cols <- setdiff(req_meta_cols, colnames(meta))
 if (length(miss_meta_cols) > 0) {
-  stop("metadata 缺少必要列：", paste(miss_meta_cols, collapse = ", "))
+  stop("metadata is missing required columns: ", paste(miss_meta_cols, collapse = ", "))
 }
 if (!"Genus" %in% colnames(abund)) {
-  stop("丰度表缺少 Genus 列")
+  stop("The abundance table is missing the Genus column")
 }
 
 meta_use <- meta %>%
@@ -205,7 +205,7 @@ meta_use <- meta %>%
 
 sample_cols <- intersect(colnames(abund), meta_use$SampleID)
 if (length(sample_cols) == 0) {
-  stop("丰度表与 metadata 没有重叠的样本列")
+  stop("The abundance table and metadata have no overlapping sample columns")
 }
 
 abund_use <- abund %>%
@@ -256,7 +256,7 @@ clr_df <- cbind(
 )
 
 ## =========================
-## 6. 图1：4个经典代表菌，每个菌一行，三边都画
+## 6. Fig. 1: four representative genera, one row per genus, with all three edges shown
 ## =========================
 core_genus_map <- data.frame(
   Genus = c(
@@ -271,7 +271,7 @@ core_genus_map <- data.frame(
 
 miss_core <- setdiff(core_genus_map$Genus, colnames(clr_df))
 if (length(miss_core) > 0) {
-  stop("以下核心代表菌不在 CLR 数据中：", paste(miss_core, collapse = ", "))
+  stop("The following core representative genera are not present in the CLR data: ", paste(miss_core, collapse = ", "))
 }
 
 make_pair_df <- function(genus_name) {
@@ -404,7 +404,7 @@ print(p1)
 dev.off()
 
 ## =========================
-## 7. 图2：9个代表菌 × 3条边 相关证据矩阵图
+## 7. Fig. 2: correlation-evidence matrix for 9 representative genera x 3 edges
 ## =========================
 rep9 <- data.frame(
   Genus = c(
@@ -428,7 +428,7 @@ rep9 <- data.frame(
 
 miss_rep9 <- setdiff(rep9$Genus, pattern_df$Genus)
 if (length(miss_rep9) > 0) {
-  stop("以下代表菌不在 Pattern_table 中：", paste(miss_rep9, collapse = ", "))
+  stop("The following representative genera are not present in Pattern_table: ", paste(miss_rep9, collapse = ", "))
 }
 
 mat_df_plot <- pattern_df %>%
@@ -547,4 +547,4 @@ pdf(
 print(p2)
 dev.off()
 
-message("完成：已输出两个 PDF 至 ", out_dir)
+message("Completed: two PDF files were exported to ", out_dir)

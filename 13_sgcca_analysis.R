@@ -61,9 +61,9 @@ workdir <- file.path("data", "sgcca", "input")
 file_rum     <- file.path(workdir, "Rum_genus_abundance.xlsx")
 file_ile     <- file.path(workdir, "Ile_genus_abundance.xlsx")
 file_col     <- file.path(workdir, "Col_genus_abundance.xlsx")
-file_liver   <- file.path(workdir, "肝脏筛选基因.xlsx")
+file_liver   <- file.path(workdir, "\u809d\u810f\u7b5b\u9009\u57fa\u56e0.xlsx")
 file_blood   <- file.path(workdir, "blood_phenotype_sGCCA_input.xlsx")
-file_tailfat <- file.path(workdir, "尾脂数据_16s编号转换.xlsx")
+file_tailfat <- file.path(workdir, "\u5c3e\u8102\u6570\u636e_16s\u7f16\u53f7\u8f6c\u6362.xlsx")
 
 liver_sheet <- "formal_log2TPM"
 blood_sheet <- "sgcca_blood_input"
@@ -202,13 +202,13 @@ read_blood_trait_block <- function(path, trait, sheet = "sgcca_blood_input") {
   X
 }
 
-read_tailfat_trait_block <- function(path, trait, sheet = "尾脂_16s编号") {
-  # 前4行是说明，第5行才是真正表头
+read_tailfat_trait_block <- function(path, trait, sheet = "\u5c3e\u8102_16s\u7f16\u53f7") {
+  # The first four rows are notes; the actual header starts at row 5
   df <- readxl::read_excel(path, sheet = sheet, skip = 4, col_names = TRUE)
   df <- as.data.frame(df, stringsAsFactors = FALSE)
   df <- df[, !grepl("^Unnamed", colnames(df)), drop = FALSE]
   
-  need_cols <- c("瘤胃和肠道16s编号", "尾脂g", "尾脂/胴体重g/kg", "尾脂/宰前活重g/kg")
+  need_cols <- c("\u7624\u80c3\u548c\u80a0\u905316s\u7f16\u53f7", "\u5c3e\u8102g", "\u5c3e\u8102/\u80f4\u4f53\u91cdg/kg", "\u5c3e\u8102/\u5bb0\u524d\u6d3b\u91cdg/kg")
   miss_cols <- setdiff(need_cols, colnames(df))
   if (length(miss_cols) > 0) {
     stop(sprintf(
@@ -218,9 +218,9 @@ read_tailfat_trait_block <- function(path, trait, sheet = "尾脂_16s编号") {
   }
   
   col_map <- c(
-    "TailFat_g"                = "尾脂g",
-    "TailFat_Carcass_g_per_kg" = "尾脂/胴体重g/kg",
-    "TailFat_PreLive_g_per_kg" = "尾脂/宰前活重g/kg"
+    "TailFat_g"                = "\u5c3e\u8102g",
+    "TailFat_Carcass_g_per_kg" = "\u5c3e\u8102/\u80f4\u4f53\u91cdg/kg",
+    "TailFat_PreLive_g_per_kg" = "\u5c3e\u8102/\u5bb0\u524d\u6d3b\u91cdg/kg"
   )
   
   src_col <- col_map[trait]
@@ -228,7 +228,7 @@ read_tailfat_trait_block <- function(path, trait, sheet = "尾脂_16s编号") {
     stop(sprintf("Unknown tail fat trait: %s", trait))
   }
   
-  df <- df[, c("瘤胃和肠道16s编号", src_col), drop = FALSE]
+  df <- df[, c("\u7624\u80c3\u548c\u80a0\u905316s\u7f16\u53f7", src_col), drop = FALSE]
   colnames(df) <- c("SampleID", trait)
   
   df$SampleID <- normalize_ids(df$SampleID)
@@ -454,7 +454,7 @@ for (trait in traits_to_run) {
   dir.create(trait_dir, showWarnings = FALSE, recursive = TRUE)
   
   if (trait %in% tailfat_traits) {
-    pheno_raw <- read_tailfat_trait_block(file_tailfat, trait = trait, sheet = "尾脂_16s编号")
+    pheno_raw <- read_tailfat_trait_block(file_tailfat, trait = trait, sheet = "\u5c3e\u8102_16s\u7f16\u53f7")
   } else {
     pheno_raw <- read_blood_trait_block(file_blood, trait = trait, sheet = blood_sheet)
   }

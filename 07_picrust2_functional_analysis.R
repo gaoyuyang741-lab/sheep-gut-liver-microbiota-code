@@ -1,16 +1,16 @@
 # =========================================================
-# PICRUSt2 三部位“功能梯度与功能分工”基础数据处理脚本（精简输出版）
-# 说明：
-# 1）无用的过程表全部合并到一个 Excel
-# 2）真正有用的结果表全部合并到一个 Excel
-# 3）不作图，只输出基础处理与统计整理结果
+# PICRUSt2 three-compartment functional-gradient and functional-partitioning data-processing script (streamlined output version)
+# Notes:
+# 1) All process tables are combined into one Excel file
+# 2) All core result tables are combined into one Excel file
+# 3) No figures are generated; only basic processing and statistical summaries are exported
 # =========================================================
 
 rm(list = ls())
 gc()
 
 # =========================================================
-# 0. 加载程序包
+# 0. Load packages
 # =========================================================
 pkg_needed <- c(
   "data.table", "dplyr", "tidyr", "stringr", "purrr",
@@ -27,7 +27,7 @@ options(stringsAsFactors = FALSE)
 options(datatable.fread.datatable = FALSE)
 
 # =========================================================
-# 1. 参数设置
+# 1. Parameter settings
 # =========================================================
 # Input and output directories
 # Please place the required input files in "data/picrust2/input".
@@ -38,7 +38,7 @@ out_dir   <- file.path("results", "picrust2")
 
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 
-# 输入文件
+# Input files
 ri_ko_file        <- file.path(input_dir, "RI_KO_pred_metagenome_unstrat.tsv")
 c_ko_file         <- file.path(input_dir, "C_KO_pred_metagenome_unstrat.tsv")
 metadata_file     <- file.path(input_dir, "metadata_3group.xlsx")
@@ -46,15 +46,15 @@ ko2path_file      <- file.path(input_dir, "ko2pathway.txt")
 path_name_file    <- file.path(input_dir, "pathway_list_ko.txt")
 brite_file        <- file.path(input_dir, "br08901.txt")
 
-# 元数据列名
+# Metadata column names
 sample_col <- "SampleID"
 group_col  <- "Group"
 sheep_col  <- "SheepID"
 
-# 组别顺序
+# Group order
 group_levels <- c("Rum", "Ile", "Col")
 
-# 过滤参数
+# Filtering parameters
 use_relative_abundance <- TRUE
 prev_cut_ko            <- 0.10
 mean_cut_ko            <- 1e-6
@@ -65,15 +65,15 @@ mean_cut_l2            <- 0
 prev_cut_l1            <- 0
 mean_cut_l1            <- 0
 
-# 统计参数
+# Statistical parameters
 p_adj_method <- "BH"
 sig_cut      <- 0.001
 
-# 伪计数（预留）
+# Pseudocount (reserved)
 pseudo <- 1e-12
 
 # =========================================================
-# 2. 通用函数
+# 2. General functions
 # =========================================================
 clean_group <- function(x) {
   x <- as.character(x)
@@ -268,14 +268,14 @@ write_multi_sheet_xlsx <- function(file, sheet_list) {
 }
 
 # =========================================================
-# 3. 读取 metadata
+# 3. Read metadata
 # =========================================================
 meta <- readxl::read_excel(metadata_file)
 meta <- as.data.frame(meta)
 
 need_cols <- c(sample_col, group_col, sheep_col)
 if (!all(need_cols %in% colnames(meta))) {
-  stop("metadata 缺少必要列：", paste(setdiff(need_cols, colnames(meta)), collapse = ", "))
+  stop("metadata is missing required columns: ", paste(setdiff(need_cols, colnames(meta)), collapse = ", "))
 }
 
 meta <- meta %>%
@@ -304,7 +304,7 @@ meta <- meta %>%
   arrange(SheepID, Group)
 
 # =========================================================
-# 4. 读取 KO 表
+# 4. Read KO table
 # =========================================================
 read_ko_table <- function(file, meta_sample_ids) {
   dat <- data.table::fread(file, sep = "\t", header = TRUE, check.names = FALSE)
@@ -315,7 +315,7 @@ read_ko_table <- function(file, meta_sample_ids) {
   
   sample_cols <- intersect(colnames(dat), meta_sample_ids)
   if (length(sample_cols) == 0) {
-    stop("文件中未找到与 metadata 匹配的样本列：", basename(file))
+    stop("No sample columns matching metadata were found in file: ", basename(file))
   }
   
   dat2 <- dat[, c("feature", sample_cols), drop = FALSE]
@@ -348,7 +348,7 @@ if (use_relative_abundance) {
 ko_mat_filt <- filter_feature_matrix(ko_mat, prev_cut = prev_cut_ko, mean_cut = mean_cut_ko)
 
 # =========================================================
-# 5. 注释与映射
+# 5. Annotation and mapping
 # =========================================================
 ko2path <- data.table::fread(ko2path_file, sep = "\t", header = FALSE)
 ko2path <- as.data.frame(ko2path)
@@ -424,7 +424,7 @@ ko_info_full <- ko2path %>%
   arrange(feature)
 
 # =========================================================
-# 6. KO 聚合到 pathway / L2 / L1
+# 6. Aggregate KO to pathway / L2 / L1
 # =========================================================
 ko2path_use <- ko2path %>%
   filter(feature %in% rownames(ko_mat_filt)) %>%
@@ -472,14 +472,14 @@ mode(l1_mat) <- "numeric"
 l1_mat_filt <- filter_feature_matrix(l1_mat, prev_cut = prev_cut_l1, mean_cut = mean_cut_l1)
 
 # =========================================================
-# 7. 统一 metadata 顺序
+# 7. Harmonize metadata order
 # =========================================================
 meta_use <- meta %>% filter(SampleID %in% colnames(ko_mat_filt))
 meta_use <- meta_use[match(colnames(ko_mat_filt), meta_use$SampleID), ]
 stopifnot(all(meta_use$SampleID == colnames(ko_mat_filt)))
 
 # =========================================================
-# 8. 各层级统计
+# 8. Statistics at each level
 # =========================================================
 ko_info_used <- ko_info_full %>% filter(feature %in% rownames(ko_mat_filt))
 
@@ -525,20 +525,20 @@ l1_res <- run_feature_stats(
   level_name = "L1"
 )
 
-# 显著结果
+# Significant results
 ko_sig   <- ko_res   %>% filter(overall_q < sig_cut)
 path_sig <- path_res %>% filter(overall_q < sig_cut)
 l2_sig   <- l2_res   %>% filter(overall_q < sig_cut)
 l1_sig   <- l1_res   %>% filter(overall_q < sig_cut)
 
-# 每类模式代表条目
+# Representative entries for each pattern class
 ko_top_pattern   <- top_n_each_pattern(ko_sig, n = 20)
 path_top_pattern <- top_n_each_pattern(path_sig, n = 20)
 l2_top_pattern   <- top_n_each_pattern(l2_sig, n = 20)
 l1_top_pattern   <- top_n_each_pattern(l1_sig, n = 20)
 
 # =========================================================
-# 9. 汇总表
+# 9. Summary tables
 # =========================================================
 pattern_summary <- bind_rows(
   ko_res   %>% count(level, pattern_class, name = "n"),
@@ -576,7 +576,7 @@ path_median_table <- path_res %>%
   arrange(overall_q, pattern_class, feature)
 
 # =========================================================
-# 10. 检查表
+# 10. Check tables
 # =========================================================
 sample_check <- meta_use %>%
   count(Group, name = "n_samples") %>%
@@ -625,9 +625,9 @@ filter_params <- data.frame(
 )
 
 # =========================================================
-# 11. 输出：过程表全部塞进一个 Excel
+# 11. Output: combine all process tables into one Excel file
 # =========================================================
-process_workbook <- file.path(out_dir, "PICRUSt2_过程表_合并.xlsx")
+process_workbook <- file.path(out_dir, "PICRUSt2_process_tables_combined.xlsx")
 
 write_multi_sheet_xlsx(
   process_workbook,
@@ -646,9 +646,9 @@ write_multi_sheet_xlsx(
 )
 
 # =========================================================
-# 12. 输出：有用结果全部塞进一个 Excel
+# 12. Output: combine all core result tables into one Excel file
 # =========================================================
-result_workbook <- file.path(out_dir, "PICRUSt2_核心结果_合并.xlsx")
+result_workbook <- file.path(out_dir, "PICRUSt2_core_results_combined.xlsx")
 
 write_multi_sheet_xlsx(
   result_workbook,
@@ -677,9 +677,9 @@ write_multi_sheet_xlsx(
 )
 
 # =========================================================
-# 13. 结束
+# 13. Finish
 # =========================================================
-cat("\n基础数据处理完成（精简输出版）。\n")
-cat("输出目录：", out_dir, "\n")
-cat("过程表：", process_workbook, "\n")
-cat("核心结果：", result_workbook, "\n")
+cat("\nBasic data processing completed (streamlined output version).\n")
+cat("Output directory: ", out_dir, "\n")
+cat("Process tables: ", process_workbook, "\n")
+cat("Core results: ", result_workbook, "\n")

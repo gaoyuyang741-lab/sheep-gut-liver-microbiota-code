@@ -5,7 +5,7 @@ options(stringsAsFactors = FALSE)
 gc()
 
 # -----------------------------
-# 0. 加载程序包
+# 0. Load packages
 # -----------------------------
 pkgs <- c("readxl", "dplyr", "ggplot2", "grid")
 need <- pkgs[!pkgs %in% installed.packages()[, "Package"]]
@@ -13,7 +13,7 @@ if(length(need) > 0) install.packages(need, dependencies = TRUE)
 invisible(lapply(pkgs, library, character.only = TRUE))
 
 # -----------------------------
-# 1. 文件路径
+# 1. File paths
 # -----------------------------
 # Input and output directories
 # This script reads beta-diversity PCoA coordinate files from "results/diversity/beta/03_PCoA_coordinates".
@@ -25,23 +25,23 @@ outdir    <- file.path("figures", "diversity", "beta")
 
 dir.create(outdir, showWarnings = FALSE, recursive = TRUE)
 
-bray_fp <- file.path(coord_dir, "bray_curtis_PCoA坐标.xlsx")
-jacc_fp <- file.path(coord_dir, "binary_jaccard_PCoA坐标.xlsx")
+bray_fp <- file.path(coord_dir, "bray_curtis_PCoA_coordinates.xlsx")
+jacc_fp <- file.path(coord_dir, "binary_jaccard_PCoA_coordinates.xlsx")
 
 # -----------------------------
-# 2. 读取坐标文件
+# 2. Read coordinate files
 # -----------------------------
 bray_plot_df <- readxl::read_excel(bray_fp)
 jacc_plot_df <- readxl::read_excel(jacc_fp)
 
 # -----------------------------
-# 3. 数据整理
+# 3. Data formatting
 # -----------------------------
 clean_pcoa_df <- function(df){
   req_cols <- c("SampleID", "PCoA1", "PCoA2", "Site")
   miss_cols <- setdiff(req_cols, colnames(df))
   if(length(miss_cols) > 0){
-    stop("坐标文件缺少以下列：", paste(miss_cols, collapse = ", "))
+    stop("The coordinate file is missing the following columns: ", paste(miss_cols, collapse = ", "))
   }
   
   df <- df %>%
@@ -57,7 +57,7 @@ clean_pcoa_df <- function(df){
     TRUE ~ df$Site
   )
   
-  # 图例顺序
+  # Legend order
   df$Site <- factor(df$Site, levels = c("Rum", "Ile", "Col"))
   
   return(df)
@@ -67,8 +67,8 @@ bray_plot_df <- clean_pcoa_df(bray_plot_df)
 jacc_plot_df <- clean_pcoa_df(jacc_plot_df)
 
 # -----------------------------
-# 4. 解释度
-# 这里请按你的真实结果改数字
+# 4. Explained variance
+# Please replace these values with the actual results
 # -----------------------------
 bray_pc1_var <- 11.17
 bray_pc2_var <- 9.64
@@ -77,23 +77,23 @@ jacc_pc1_var <- 3.11
 jacc_pc2_var <- 2.78
 
 # -----------------------------
-# 5. 重新配色
-# 新方案：低饱和、柔和、期刊风
+# 5. Update color scheme
+# New scheme: low-saturation, soft, journal-style colors
 # -----------------------------
 fill_cols <- c(
-  "Ile" = "#C7D4E2",   # 灰蓝填充
-  "Rum" = "#D7CADF",   # 灰紫填充
-  "Col" = "#D7E1D6"    # 灰绿填充
+  "Ile" = "#C7D4E2",   # gray-blue fill
+  "Rum" = "#D7CADF",   # gray-purple fill
+  "Col" = "#D7E1D6"    # gray-green fill
 )
 
 point_cols <- c(
-  "Ile" = "#7C9BB8",   # 灰蓝点/线
-  "Rum" = "#8A5A9E",   # 灰紫点/线
-  "Col" = "#7F9A7A"    # 灰绿点/线
+  "Ile" = "#7C9BB8",   # gray-blue points/lines
+  "Rum" = "#8A5A9E",   # gray-purple points/lines
+  "Col" = "#7F9A7A"    # gray-green points/lines
 )
 
 # -----------------------------
-# 6. 主题函数
+# 6. Theme function
 # -----------------------------
 pcoa_theme_ref <- function(){
   theme_classic(base_size = 13) +
@@ -119,7 +119,7 @@ pcoa_theme_ref <- function(){
 }
 
 # -----------------------------
-# 7. 作图函数
+# 7. Plotting function
 # -----------------------------
 make_pcoa_plot_ref_3site <- function(df, xvar, yvar, xlab_txt, ylab_txt){
   
@@ -156,7 +156,7 @@ make_pcoa_plot_ref_3site <- function(df, xvar, yvar, xlab_txt, ylab_txt){
 }
 
 # -----------------------------
-# 8. 生成图形
+# 8. Generate figures
 # -----------------------------
 p_bray <- make_pcoa_plot_ref_3site(
   df = bray_plot_df,
@@ -175,13 +175,13 @@ p_jacc <- make_pcoa_plot_ref_3site(
 )
 
 # -----------------------------
-# 9. 显示
+# 9. Display
 # -----------------------------
 print(p_bray)
 print(p_jacc)
 
 # -----------------------------
-# 10. 保存
+# 10. Save
 # -----------------------------
 ggsave(
   filename = file.path(outdir, "PCoA_BrayCurtis_PC1_PC2_refstyle_3site_v2.tiff"),
@@ -220,7 +220,7 @@ ggsave(
 )
 
 # -----------------------------
-# 11. 保存作图数据
+# 11. Save plotting data
 # -----------------------------
 write.csv(
   bray_plot_df,

@@ -27,7 +27,7 @@ left_join  <- dplyr::left_join
 inner_join <- dplyr::inner_join
 
 # ============================================================
-# 一、路径参数
+# 1. Path parameters
 # ============================================================
 # Input and output directories
 # This script reads sGCCA output files from "results/sgcca/sgcca_5block_8traits_out".
@@ -38,10 +38,10 @@ output_root <- file.path("results", "sgcca", "refined_results")
 
 dir.create(output_root, showWarnings = FALSE, recursive = TRUE)
 # ============================================================
-# 二、后处理标准参数区
+# 2. Post-processing criteria parameters
 # ============================================================
 params <- list(
-  # ---------- 第一层：模型是否成立 ----------
+  # ---------- Layer 1: whether the model is supported ----------
   ave_inner_a = 0.40,
   ave_inner_b = 0.30,
   
@@ -49,7 +49,7 @@ params <- list(
   corr_other_pairs = 0.35,
   min_other_pairs_n = 2,
   
-  # ---------- 第二层：主链由谁组成 ----------
+  # ---------- Layer 2: composition of the main chain ----------
   feature_method = "top_n",
   
   top_n_rum   = 10,
@@ -70,7 +70,7 @@ params <- list(
   min_abs_loading_liver = 0,
   min_abs_loading_trait = 0,
   
-  # ---------- 第三层：链条结构是什么 ----------
+  # ---------- Layer 3: chain structure ----------
   edge_source_liver = 0.40,
   edge_source_liver_candidate = 0.30,
   edge_liver_trait = 0.40,
@@ -82,7 +82,7 @@ params <- list(
 )
 
 # ============================================================
-# 三、辅助函数
+# 3. Helper functions
 # ============================================================
 dir.create(output_root, recursive = TRUE, showWarnings = FALSE)
 
@@ -154,9 +154,9 @@ judge_model <- function(diag_df, corr_long, params) {
   
   model_level <- dplyr::case_when(
     !is.na(ave_inner) && ave_inner >= params$ave_inner_a &&
-      isTRUE(trait_liver_ok$ok) && other_ok_n >= params$min_other_pairs_n ~ "A_模型成立_可作为主体解释",
-    !is.na(ave_inner) && ave_inner >= params$ave_inner_b ~ "B_模型基本成立_可辅助解释",
-    TRUE ~ "C_模型较弱_不建议深讲"
+      isTRUE(trait_liver_ok$ok) && other_ok_n >= params$min_other_pairs_n ~ "A_model_supported_primary_interpretation",
+    !is.na(ave_inner) && ave_inner >= params$ave_inner_b ~ "B_model_partly_supported_secondary_interpretation",
+    TRUE ~ "C_model_weak_not_recommended_for_detailed_interpretation"
   )
   
   tibble(
@@ -164,7 +164,7 @@ judge_model <- function(diag_df, corr_long, params) {
     trait_liver_pass = isTRUE(trait_liver_ok$ok),
     other_pair_pass_n = other_ok_n,
     model_level = model_level,
-    model_pass = model_level != "C_模型较弱_不建议深讲"
+    model_pass = model_level != "C_model_weak_not_recommended_for_detailed_interpretation"
   )
 }
 
@@ -249,7 +249,7 @@ build_core_features <- function(load_df, trait_name, params) {
 }
 
 # ------------------------------------------------------------
-# 新增：block 内 z-score 标准化函数
+# Added: within-block z-score standardization function
 # ------------------------------------------------------------
 standardize_chain_score_within_block <- function(df) {
   if (nrow(df) == 0) return(df)
@@ -366,10 +366,10 @@ build_chain_table <- function(edges_df, core_features_df, trait_name, params) {
       chain_score_raw = source_abs_loading * liver_abs_loading *
         abs_corr_source_liver * abs_corr_liver_trait,
       chain_type = case_when(
-        corr_source_liver >= 0 & corr_liver_trait >= 0 ~ "同向-同向链",
-        corr_source_liver >= 0 & corr_liver_trait <  0 ~ "同向-反向链",
-        corr_source_liver <  0 & corr_liver_trait >= 0 ~ "反向-同向链",
-        TRUE ~ "反向-反向链"
+        corr_source_liver >= 0 & corr_liver_trait >= 0 ~ "positive-positive chain",
+        corr_source_liver >= 0 & corr_liver_trait <  0 ~ "positive-negative chain",
+        corr_source_liver <  0 & corr_liver_trait >= 0 ~ "negative-positive chain",
+        TRUE ~ "negative-negative chain"
       )
     ) %>%
     standardize_chain_score_within_block() %>%
@@ -522,7 +522,7 @@ process_one_trait <- function(trait_dir, output_root, params) {
   dim_df   <- safe_read_csv(fp_dim)
   
   if (is.null(corr_df) || is.null(load_df) || is.null(edges_df)) {
-    warning("缺少关键文件，跳过：", trait_folder)
+    warning("Missing key file(s); skipping: ", trait_folder)
     return(NULL)
   }
   
@@ -588,20 +588,20 @@ process_one_trait <- function(trait_dir, output_root, params) {
 }
 
 # ============================================================
-# 四、批量处理八个表型
+# 4. Batch processing for eight traits
 # ============================================================
 trait_dirs <- list.dirs(input_root, recursive = FALSE, full.names = TRUE)
 trait_dirs <- trait_dirs[grepl("^sGCCA_", basename(trait_dirs))]
 
 if (length(trait_dirs) == 0) {
-  stop("在 input_root 下未找到 sGCCA_* 文件夹，请检查路径。")
+  stop("No sGCCA_* folders were found under input_root; please check the path.")
 }
 
 res_list <- purrr::map(trait_dirs, process_one_trait, output_root = output_root, params = params)
 res_list <- res_list[!vapply(res_list, is.null, logical(1))]
 
 # ============================================================
-# 五、跨表型总汇总
+# 5. Cross-trait overall summary
 # ============================================================
 all_summary        <- bind_rows(purrr::map(res_list, "summary"))
 all_core_features  <- bind_rows(purrr::map(res_list, "core_features"))
@@ -626,4 +626,4 @@ add_sheet_with_style(wb_all, "feature_modules_all", all_feature_module)
 add_sheet_with_style(wb_all, "chain_modules_all", all_chain_module)
 saveWorkbook(wb_all, file.path(output_root, "sGCCA_postprocess_all_traits.xlsx"), overwrite = TRUE)
 
-message("\n全部完成。输出目录：", output_root)
+message("\nAll steps completed. Output directory: ", output_root)

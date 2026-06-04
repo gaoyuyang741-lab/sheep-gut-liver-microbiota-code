@@ -1,5 +1,5 @@
 ############################################################
-# 输出：
+# Output:
 #   Fig1_pattern_ring_KO_Pathway_L2.pdf
 #   Fig2_filtered_L2_function_division.pdf
 #   Fig4_representative_pathway_pattern_trajectories.pdf
@@ -12,7 +12,7 @@ gc()
 graphics.off()
 
 ############################
-# 0. 加载程序包
+# 0. Load packages
 ############################
 need_pkgs <- c(
   "readxl", "openxlsx", "dplyr", "tidyr", "stringr", "forcats",
@@ -41,7 +41,7 @@ suppressPackageStartupMessages({
 options(stringsAsFactors = FALSE)
 
 ############################
-# 1. 路径设置
+# 1. Path settings
 ############################
 find_file <- function(primary, fallback = NULL) {
   if (!is.null(primary) && file.exists(primary)) return(primary)
@@ -51,8 +51,8 @@ find_file <- function(primary, fallback = NULL) {
 }
 
 fp_picrust <- find_file(
-  file.path("results", "picrust2", "PICRUSt2_核心结果_合并.xlsx"),
-  "PICRUSt2_核心结果_合并.xlsx"
+  file.path("results", "picrust2", "PICRUSt2_core_results_combined.xlsx"),
+  "PICRUSt2_core_results_combined.xlsx"
 )
 
 fp_genus <- find_file(
@@ -64,7 +64,7 @@ outdir <- file.path("figures", "picrust2")
 dir.create(outdir, showWarnings = FALSE, recursive = TRUE)
 
 ############################
-# 2. 字体与保存函数
+# 2. Font and saving functions
 ############################
 font_family <- "sans"
 font_candidates <- c(
@@ -117,7 +117,7 @@ theme_sci <- function(base_size = 12) {
 }
 
 ############################
-# 3. 配色
+# 3. Color palette
 ############################
 col_fgh   <- "#C58A8A"
 col_fhc   <- "#B8A18C"
@@ -147,15 +147,15 @@ source_cols <- c(
 )
 
 ############################
-# 4. 辅助函数
+# 4. Helper functions
 ############################
 to_pattern_en <- function(x) {
   dplyr::case_when(
-    x %in% c("前肠偏高型", "FGH") ~ "FGH",
-    x %in% c("前后肠协同型", "FHC") ~ "FHC",
-    x %in% c("梯度型", "Grad") ~ "Grad",
-    x %in% c("后肠偏高型", "HGH") ~ "HGH",
-    x %in% c("回肠过渡型", "Ile transition", "IT") ~ "IT",
+    x %in% c("Foregut-enriched", "FGH") ~ "FGH",
+    x %in% c("Foregut-hindgut coordinated", "FHC") ~ "FHC",
+    x %in% c("Gradient", "Grad") ~ "Grad",
+    x %in% c("Hindgut-enriched", "HGH") ~ "HGH",
+    x %in% c("Ileal-transition", "Ile transition", "IT") ~ "IT",
     TRUE ~ as.character(x)
   )
 }
@@ -234,13 +234,13 @@ wrap_two_lines <- function(x, width = 24) {
 }
 
 ############################
-# 5. 读入数据
+# 5. Read data
 ############################
 sheet_names <- excel_sheets(fp_picrust)
 req_sheets <- c("summary_pattern", "pathway_all_results", "pathway_sig_results", "KO_all_results")
 missing_sheets <- setdiff(req_sheets, sheet_names)
 if (length(missing_sheets) > 0) {
-  stop("PICRUSt2 结果文件缺少 sheet: ", paste(missing_sheets, collapse = ", "))
+  stop("PICRUSt2 result file is missing sheet(s): ", paste(missing_sheets, collapse = ", "))
 }
 
 sum_pattern <- read_excel(fp_picrust, sheet = "summary_pattern")
@@ -464,12 +464,12 @@ if (nrow(fig4_base) > 0) {
     width = 10.8, height = 7.4
   )
 } else {
-  warning("Fig4 未匹配到任何 pathway，请检查 pathway_name。")
+  warning("No pathway was matched for Fig. 4; please check pathway_name.")
 }
 
 ############################
 # 9. FIGURE 5
-# 强制固定 5 个 pathway，不再让绘图自己推断
+# Force five fixed pathways instead of inferring them during plotting
 ############################
 genus_nodes <- tibble::tribble(
   ~Genus,                   ~Genus_source,
@@ -526,7 +526,7 @@ g_med_i    <- guess_first(c("med_Ile", "median_Ile", "Ile_median"), genus_cn)
 g_med_c    <- guess_first(c("med_Col", "median_Col", "Col_median"), genus_cn)
 
 if (is.na(genus_col) || is.na(g_q_col) || is.na(g_med_r) || is.na(g_med_i) || is.na(g_med_c)) {
-  stop("08_spatial_pattern_classification_main_table.xlsx 缺少必要列，请检查 genus / q / median_Rum/Ile/Col 列名。")
+  stop("08_spatial_pattern_classification_main_table.xlsx is missing required columns; please check genus / q / median_Rum/Ile/Col column names.")
 }
 
 genus_sel <- genus_main %>%
@@ -588,10 +588,10 @@ fig5_df <- edge_genus_ko %>%
   ) %>%
   select(Genus_source, Genus_show, KO_show, Pathway_show_raw, Pathway_show, weight)
 
-# 强制固定 5 个右侧 pathway 顺序
+# Force the order of the five right-side pathways
 pathway_show_levels <- shorten_pathway_fixed(pathway_keep_fixed)
 
-# 排序
+# Sorting
 genus_order <- fig5_df %>%
   group_by(Genus_source, Genus_show) %>%
   summarise(w = sum(weight), .groups = "drop") %>%
@@ -670,7 +670,7 @@ save_pdf_editable(
 )
 
 ############################
-# 10. 导出核查表
+# 10. Export check tables
 ############################
 wb <- createWorkbook()
 
@@ -709,10 +709,10 @@ saveWorkbook(
 )
 
 ############################
-# 11. 完成提示
+# 11. Completion messages
 ############################
-message("全部完成。输出目录：", normalizePath(outdir, winslash = "/"))
-message("已输出：")
+message("All steps completed. Output directory: ", normalizePath(outdir, winslash = "/"))
+message("Generated files:")
 message("  Fig1_pattern_ring_KO_Pathway_L2.pdf")
 message("  Fig2_filtered_L2_function_division.pdf")
 if (exists("fig4_base") && nrow(fig4_base) > 0) {

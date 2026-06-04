@@ -1,7 +1,7 @@
 # =========================================================
 
 # =========================
-# 0. 安装/加载包
+# 0. Install/load packages
 # =========================
 need_pkgs <- c(
   "dplyr", "tidyr", "ggplot2", "stringr",
@@ -24,7 +24,7 @@ filter <- dplyr::filter
 mutate <- dplyr::mutate
 
 # =========================
-# 1. 文件路径
+# 1. File paths
 # =========================
 # Input and output directories
 # Please place the raw alpha-diversity tables in "data/diversity/alpha/input".
@@ -49,7 +49,7 @@ pairwise_fp <- file.path(
 out_dir <- file.path("figures", "diversity", "alpha")
 dir.create(out_dir, showWarnings = FALSE, recursive = TRUE)
 # =========================
-# 2. 全局作图参数
+# 2. Global plotting parameters
 # =========================
 base_family <- "Helvetica"
 
@@ -90,7 +90,7 @@ plot_height <- 4.4
 plot_dpi    <- 600
 
 # =========================
-# 3. 读取 alpha 文件函数
+# 3. Function for reading alpha-diversity files
 # =========================
 read_alpha_file <- function(in_file) {
   df <- tryCatch(
@@ -118,7 +118,7 @@ read_alpha_file <- function(in_file) {
   }
   
   if (is.null(df)) {
-    stop(paste0("无法读取文件：", in_file))
+    stop(paste0("Unable to read file: ", in_file))
   }
   
   names(df) <- str_replace_all(names(df), "\\s+", "_")
@@ -139,7 +139,7 @@ read_alpha_file <- function(in_file) {
   if (length(pd_col) == 0) {
     pd_col2 <- grep("^PD", names(df), value = TRUE)
     if (length(pd_col2) == 0) {
-      stop(paste0("找不到 PD 列。当前列名：", paste(names(df), collapse = ", ")))
+      stop(paste0("PD column not found. Current column names: ", paste(names(df), collapse = ", ")))
     } else {
       pd_col <- pd_col2[1]
     }
@@ -157,14 +157,14 @@ read_alpha_file <- function(in_file) {
 }
 
 # =========================
-# 4. 读取原始数据
+# 4. Read raw data
 # =========================
 alpha_ri <- read_alpha_file(alpha_fp_ri)
 alpha_c  <- read_alpha_file(alpha_fp_c)
 alpha    <- bind_rows(alpha_ri, alpha_c)
 
 # =========================
-# 5. 整理 alpha 原始数据
+# 5. Format raw alpha-diversity data
 # =========================
 alpha2 <- alpha %>%
   mutate(
@@ -198,15 +198,15 @@ alpha2 <- alpha2 %>%
   )
 
 # =========================
-# 6. 读取并整理两两比较结果
+# 6. Read and format pairwise comparison results
 # =========================
 pairwise_stat <- read_excel(pairwise_fp)
 
 if (!"index" %in% colnames(pairwise_stat)) {
-  stop("alpha_pairwise_wilcox.xlsx 中未找到列名：'index'")
+  stop("alpha_pairwise_wilcox.xlsx does not contain the column：'index'")
 }
 if (!"contrast" %in% colnames(pairwise_stat)) {
-  stop("alpha_pairwise_wilcox.xlsx 中未找到列名：'contrast'")
+  stop("alpha_pairwise_wilcox.xlsx does not contain the column：'contrast'")
 }
 
 pairwise_stat2 <- pairwise_stat %>%
@@ -240,7 +240,7 @@ pairwise_stat2 <- pairwise_stat %>%
   )
 
 # =========================
-# 7. 指标名映射
+# 7. Metric-name mapping
 # =========================
 xlab_map <- c(
   "ACE"           = "ACE index",
@@ -251,7 +251,7 @@ xlab_map <- c(
 )
 
 # =========================
-# 8. 单指标作图函数
+# 8. Single-metric plotting function
 # =========================
 plot_alpha_triplet_pairwise <- function(dat, stat_tab, metric_name,
                                         width = plot_width,
@@ -259,7 +259,7 @@ plot_alpha_triplet_pairwise <- function(dat, stat_tab, metric_name,
                                         dpi = plot_dpi) {
   
   if(!metric_name %in% colnames(dat)){
-    stop(paste0("原始 alpha 数据中不存在指标列：", metric_name))
+    stop(paste0("The raw alpha-diversity data do not contain the metric column: ", metric_name))
   }
   
   plot_df <- dat %>%
@@ -281,7 +281,7 @@ plot_alpha_triplet_pairwise <- function(dat, stat_tab, metric_name,
   y_range <- y_max - y_min
   if(y_range == 0) y_range <- abs(y_max) * 0.1 + 1
   
-  # 三层括号高度
+  # Bracket heights for three comparison layers
   bracket_base <- y_max + y_range * 0.08
   bracket_step <- y_range * 0.10
   upper_lim    <- y_max + y_range * 0.42
@@ -362,7 +362,7 @@ plot_alpha_triplet_pairwise <- function(dat, stat_tab, metric_name,
       plot.margin = margin(t = 16, r = 14, b = 10, l = 12)
     )
   
-  # 叠加三条两两比较括号
+  # Overlay three pairwise-comparison brackets
   if (nrow(stat_sub) > 0) {
     for (i in seq_len(nrow(stat_sub))) {
       x1 <- stat_sub$x1[i]
@@ -432,7 +432,7 @@ plot_alpha_triplet_pairwise <- function(dat, stat_tab, metric_name,
 }
 
 # =========================
-# 9. 批量输出
+# 9. Batch output
 # =========================
 metrics_to_plot <- c("ACE", "Chao1", "Shannon", "Simpson", "PD_whole_tree")
 

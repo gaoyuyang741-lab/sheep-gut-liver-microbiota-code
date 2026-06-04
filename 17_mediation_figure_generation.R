@@ -105,7 +105,7 @@ theme_clean <- theme_bw(base_family = base_family) +
     plot.margin = margin(10, 12, 10, 10)
   )
 
-## 温和配色
+## Soft color palette
 col_ile  <- "#D79A93"
 col_rum  <- "#7AA6A1"
 col_col  <- "#9AA9C9"
@@ -113,7 +113,7 @@ col_bar  <- "#B79C84"
 col_low  <- "#F3E4D4"
 col_high <- "#86AAA5"
 
-## 三角图配色（沿用旧风格）
+## Triangle-plot colors based on the previous style
 col_node  <- "#5A8991"
 col_edge  <- "#606060"
 col_arrow <- "#E32636"
@@ -125,12 +125,12 @@ col_text  <- "#222222"
 ############################
 sheet_names <- excel_sheets(xlsx_file_main)
 if (!"combined_sig_only" %in% sheet_names) {
-  stop("Excel 中未找到工作表：combined_sig_only")
+  stop("The worksheet combined_sig_only was not found in the Excel file.")
 }
 
 dat_main <- read_excel(xlsx_file_main, sheet = "combined_sig_only")
 
-if (nrow(dat_main) == 0) stop("combined_sig_only 工作表为空，无法作图。")
+if (nrow(dat_main) == 0) stop("The combined_sig_only worksheet is empty; figures cannot be generated.")
 
 req_cols <- c(
   "source_block", "source_feature", "mediator_feature", "trait_feature",
@@ -138,7 +138,7 @@ req_cols <- c(
 )
 miss_cols <- setdiff(req_cols, colnames(dat_main))
 if (length(miss_cols) > 0) {
-  stop("结果表缺少必要列：", paste(miss_cols, collapse = ", "))
+  stop("The result table is missing required columns: ", paste(miss_cols, collapse = ", "))
 }
 
 if ("prop_med_p" %in% colnames(dat_main)) {
@@ -146,13 +146,13 @@ if ("prop_med_p" %in% colnames(dat_main)) {
 } else if ("acme_p" %in% colnames(dat_main)) {
   dat_main <- dat_main %>% mutate(center_p = acme_p)
 } else {
-  stop("结果表中未找到 prop_med_p 或 acme_p 列。")
+  stop("Neither prop_med_p nor acme_p was found in the result table.")
 }
 
 ############################
 ## 4. Figure 1
 ############################
-## Panel A: 不同部位 × 表型 的显著链条数
+## Panel A: number of significant chains by compartment and phenotype
 fig1_a_dat <- dat_main %>%
   mutate(
     trait_feature = pretty_trait(trait_feature),
@@ -172,7 +172,7 @@ p_fig1_a <- ggplot(fig1_a_dat, aes(x = trait_feature, y = n, fill = source_block
   theme_clean +
   theme(legend.position = "top")
 
-## Panel B: 核心中介基因总体链条数
+## Panel B: total number of chains for core mediator genes
 fig1_b_dat <- dat_main %>%
   count(mediator_feature, name = "n") %>%
   arrange(desc(n)) %>%
@@ -184,7 +184,7 @@ p_fig1_b <- ggplot(fig1_b_dat, aes(x = n, y = mediator_feature)) +
   labs(x = "Significant chains", y = NULL) +
   theme_clean
 
-## Panel C: 核心中介基因 × 表型 热图
+## Panel C: heatmap of core mediator genes by phenotype
 fig1_c_dat <- dat_main %>%
   mutate(trait_feature = pretty_trait(trait_feature)) %>%
   filter(mediator_feature %in% c("SCARB1", "HSD17B12", "APOB", "AMACR", "HADHB", "PCK2", "FDFT1")) %>%
@@ -205,7 +205,7 @@ p_fig1 <- p_fig1_a + p_fig1_b + p_fig1_c +
 ############################
 ## 5. Selected 9 chains
 ############################
-## 最终锁定 9 条链条
+## Final selected set of 9 chains
 targets_main9 <- tibble::tribble(
   ~source_block, ~source_feature,                         ~mediator_feature, ~trait_feature, ~panel_order,
   "Rum",         "Alcaligenes",                           "HSD17B12",        "TBA",          1,
@@ -246,7 +246,7 @@ if (nrow(dat_plot_main9) != 9) {
       by = c("source_block", "source_feature", "mediator_feature", "trait_feature")
     )
   print(miss_show)
-  stop("选定的 9 条链条未完整匹配到结果表，请检查名称是否一致。")
+  stop("The selected 9 chains were not fully matched to the result table. Please check whether the names are consistent.")
 }
 
 ############################
@@ -254,7 +254,7 @@ if (nrow(dat_plot_main9) != 9) {
 ############################
 make_triangle_plot <- function(dat_plot, ncol_wrap = 3, source_parse = TRUE, mediator_parse = FALSE) {
   
-  ## 等边三角形几何参数（沿用旧 mediation 脚本）
+  ## Geometric parameters for the equilateral triangle based on the previous mediation script
   side_len <- 0.50
   
   x_left  <- 0.25
@@ -639,7 +639,7 @@ p_fig3 <- make_mediation_sankey(dat_plot_main9)
 ############################
 ## 9. Supplementary Sankey S1
 ############################
-## 整体压缩版：12条（TBA 6 + TG 2 + GLU 2 + TailFat 1）
+## Compact overall version: 12 chains (TBA 6 + TG 2 + GLU 2 + TailFat 1)
 targets_sankey_s1 <- tibble::tribble(
   ~source_block, ~source_feature,                         ~mediator_feature, ~trait_feature, ~group_type, ~group_order,
   "Rum",         "Alcaligenes",                           "HSD17B12",        "TBA",          "TBA",       1,
@@ -669,7 +669,7 @@ if (nrow(dat_sankey_s1) != nrow(targets_sankey_s1)) {
       by = c("source_block", "source_feature", "mediator_feature", "trait_feature")
     )
   print(miss_s1)
-  stop("S1 补充桑基图中的部分链条未匹配到结果表，请检查名称是否一致。")
+  stop("Some chains in the S1 supplementary Sankey plot were not matched to the result table. Please check whether the names are consistent.")
 }
 
 p_figS1 <- make_mediation_sankey(dat_sankey_s1)
@@ -677,7 +677,7 @@ p_figS1 <- make_mediation_sankey(dat_sankey_s1)
 ############################
 ## 10. Supplementary Sankey S2
 ############################
-## TBA 专题版：8条（Rum 4 + Col 4）
+## TBA-focused version: 8 chains (Rum 4 + Col 4)
 targets_sankey_s2 <- tibble::tribble(
   ~source_block, ~source_feature,                         ~mediator_feature, ~trait_feature, ~group_order,
   "Rum",         "Alcaligenes",                           "HSD17B12",        "TBA",          1,
@@ -704,7 +704,7 @@ if (nrow(dat_sankey_s2) != nrow(targets_sankey_s2)) {
       by = c("source_block", "source_feature", "mediator_feature", "trait_feature")
     )
   print(miss_s2)
-  stop("S2 补充桑基图中的部分链条未匹配到结果表，请检查名称是否一致。")
+  stop("Some chains in the S2 supplementary Sankey plot were not matched to the result table. Please check whether the names are consistent.")
 }
 
 p_figS2 <- make_mediation_sankey(dat_sankey_s2)
@@ -773,10 +773,10 @@ write.csv(fig1_a_dat, file.path(outdir, "Fig1_panelA_trait_by_source_count.csv")
 write.csv(fig1_b_dat, file.path(outdir, "Fig1_panelB_top_mediator_count.csv"), row.names = FALSE)
 write.csv(fig1_c_dat, file.path(outdir, "Fig1_panelC_key_mediator_trait_matrix.csv"), row.names = FALSE)
 
-cat("作图完成：\n")
+cat("Figure generation completed:\n")
 cat("Fig1 PDF：", fig1_pdf, "\n")
 cat("Fig2 PDF：", fig2_pdf, "\n")
 cat("Fig3 PDF：", fig3_pdf, "\n")
 cat("FigS1 PDF：", figS1_pdf, "\n")
 cat("FigS2 PDF：", figS2_pdf, "\n")
-cat("输出目录：", outdir, "\n")
+cat("Output directory: ", outdir, "\n")

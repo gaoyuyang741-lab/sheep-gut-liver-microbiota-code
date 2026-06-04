@@ -48,7 +48,7 @@ read_alpha_file <- function(in_file) {
   # ---------- attempt 1: read as real Excel ----------
   df <- tryCatch(
     {
-      message("尝试按 Excel 读取: ", in_file)
+      message("Attempting to read as Excel: ", in_file)
       readxl::read_excel(in_file, sheet = 1)
     },
     error = function(e) NULL
@@ -58,7 +58,7 @@ read_alpha_file <- function(in_file) {
   if (is.null(df)) {
     df <- tryCatch(
       {
-        message("按 Excel 读取失败，尝试按制表符文本读取: ", in_file)
+        message("Excel reading failed; attempting to read as tab-delimited text: ", in_file)
         read.delim(
           in_file,
           header = TRUE,
@@ -80,7 +80,7 @@ read_alpha_file <- function(in_file) {
     }
     df <- tryCatch(
       {
-        message("制表符读取失败，尝试 data.table::fread 自动识别: ", in_file)
+        message("Tab-delimited reading failed; attempting automatic detection with data.table::fread: ", in_file)
         data.table::fread(
           in_file,
           data.table = FALSE,
@@ -93,8 +93,8 @@ read_alpha_file <- function(in_file) {
   
   # ---------- fail ----------
   if (is.null(df)) {
-    stop(paste0("无法读取文件：", in_file,
-                "\n请检查该文件是否能在 Excel 中正常打开，或把它另存为 .xlsx 后再运行。"))
+    stop(paste0("Unable to read file: ", in_file,
+                "\nPlease check whether the file can be opened normally in Excel, or save it as .xlsx and rerun."))
   }
   
   # ---------- normalize column names ----------
@@ -118,7 +118,7 @@ read_alpha_file <- function(in_file) {
   if (length(pd_col) == 0) {
     pd_col2 <- grep("^PD", names(df), value = TRUE)
     if (length(pd_col2) == 0) {
-      stop(paste0("找不到 PD 列。当前列名：", paste(names(df), collapse = ", ")))
+      stop(paste0("PD column not found. Current column names: ", paste(names(df), collapse = ", ")))
     } else {
       pd_col <- pd_col2[1]
     }
@@ -130,8 +130,8 @@ read_alpha_file <- function(in_file) {
   need_cols <- c("Sample_ID", "Feature", "ACE", "Chao1", "Simpson", "Shannon", "Coverage")
   missing_cols <- setdiff(need_cols, names(df))
   if (length(missing_cols) > 0) {
-    stop(paste0("缺少列：", paste(missing_cols, collapse = ", "),
-                "\n当前列名：", paste(names(df), collapse = ", ")))
+    stop(paste0("Missing columns: ", paste(missing_cols, collapse = ", "),
+                "\nCurrent column names: ", paste(names(df), collapse = ", ")))
   }
   
   # standardize PD name
